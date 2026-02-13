@@ -5,6 +5,7 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:class_timer/main.dart';
@@ -12,7 +13,9 @@ import 'package:class_timer/main.dart';
 void main() {
   testWidgets('Onboarding screen smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ClassTimerPro(initialRoute: '/'));
+    await tester.pumpWidget(
+      const ClassTimerPro(initialRoute: '/', initialThemeMode: ThemeMode.light),
+    );
 
     // Verify that onboarding starts with the first page.
     expect(find.text('Import Effortlessly'), findsOneWidget);

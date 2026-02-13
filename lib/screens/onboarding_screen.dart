@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
 import '../services/local_storage_service.dart';
@@ -20,19 +21,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Import Effortlessly',
       description:
           'Upload your timetable from Excel, PDF, or even a screenshot.',
-      icon: Icons.upload_file,
+      assetPath: 'assets/svg/import.svg',
     ),
     OnboardingData(
       title: 'Smart Scheduling',
       description:
           'Automatically detect conflicts and get smart study suggestions.',
-      icon: Icons.smart_toy_outlined,
+      assetPath: 'assets/svg/schedule.svg',
     ),
     OnboardingData(
       title: 'Focus Mode',
       description:
           'Banish distractions during study sessions with deep focus mode.',
-      icon: Icons.timer_outlined,
+      assetPath: 'assets/svg/focus.svg',
     ),
   ];
 
@@ -111,7 +112,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(data.icon, size: 100, color: AppColors.vibrantTeal),
+          SvgPicture.asset(data.assetPath, height: 250, fit: BoxFit.contain),
           const SizedBox(height: 40),
           Text(
             data.title,
@@ -135,11 +136,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingData {
   final String title;
   final String description;
-  final IconData icon;
+  final String assetPath;
 
   OnboardingData({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.assetPath,
   });
 }
