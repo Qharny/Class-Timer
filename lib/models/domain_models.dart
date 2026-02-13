@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'class_event.dart';
 
 enum EventType { classEvent, study }
 
@@ -81,6 +82,43 @@ class EventEntity {
       endTime: end,
       venue: parsed.venue,
       priority: 1, // Default priority for classes
+    );
+  }
+
+  factory EventEntity.fromClassEvent(ClassEvent e) {
+    final now = DateTime.now();
+    int daysToAdd = e.dayOfWeek - now.weekday;
+    if (daysToAdd < 0) daysToAdd += 7;
+
+    final baseDate = now.add(Duration(days: daysToAdd));
+
+    final startParts = e.startTime.split(':');
+    final endParts = e.endTime.split(':');
+
+    final start = DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      int.parse(startParts[0]),
+      int.parse(startParts[1]),
+    );
+
+    final end = DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      int.parse(endParts[0]),
+      int.parse(endParts[1]),
+    );
+
+    return EventEntity(
+      id: e.id,
+      title: e.title,
+      type: e.type == 'class' ? EventType.classEvent : EventType.study,
+      startTime: start,
+      endTime: end,
+      venue: e.venue,
+      priority: e.type == 'class' ? 1 : 0,
     );
   }
 

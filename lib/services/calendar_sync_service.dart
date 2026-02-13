@@ -11,14 +11,6 @@ class CalendarSyncService {
     //   await _createExternal(event);
   }
 
-  Future<void> _updateExternal(EventEntity event) async {
-    // Future: Use device_calendar package to update
-  }
-
-  Future<void> _createExternal(EventEntity event) async {
-    // Future: Use device_calendar package to create
-  }
-
   /// Handles when events are deleted externally.
   Future<void> handleExternalDeletion(String externalId) async {
     // Logic to remove local link or delete local event

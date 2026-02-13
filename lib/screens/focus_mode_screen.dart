@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/class_event.dart';
 import '../models/study_session.dart';
 import '../services/local_storage_service.dart';
+import '../services/focus_mode_service.dart';
 
 class FocusModeScreen extends StatefulWidget {
   final ClassEvent event;
@@ -160,85 +161,77 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final focusService = FocusModeService();
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: Colors.black, // Immersive dark background
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Top: Subject Title
               Text(
-                widget.event.title,
-                style: theme.textTheme.headlineSmall?.copyWith(
+                widget.event.title.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  letterSpacing: 4,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'FOCUS SESSION',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  letterSpacing: 2,
-                ),
-              ),
-              const SizedBox(height: 64),
-              Stack(
-                alignment: Alignment.center,
+              const Spacer(),
+
+              // Middle: Countdown Timer
+              Column(
                 children: [
-                  SizedBox(
-                    width: 280,
-                    height: 280,
-                    child: CircularProgressIndicator(
-                      value: _totalDurationSeconds > 0
-                          ? _secondsRemaining / _totalDurationSeconds
-                          : 0,
-                      strokeWidth: 12,
-                      backgroundColor: theme.colorScheme.primary.withOpacity(
-                        0.1,
-                      ),
-                    ),
-                  ),
                   Text(
                     _formatTime(_secondsRemaining),
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontSize: 64,
-                      fontWeight: FontWeight.w300,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 84,
+                      fontWeight: FontWeight.w200,
+                      fontFamily: 'Courier', // Monospace for stability
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Motivational Micro-text
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 500),
+                    child: Text(
+                      focusService.getRandomPhrase(),
+                      key: ValueKey(
+                        _secondsRemaining ~/ 10,
+                      ), // Change every 10s
+                      style: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 64),
+
+              const Spacer(),
+
+              // Bottom: Controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildControlCircle(
-                    icon: Icons.stop,
-                    color: Colors.red.withOpacity(0.1),
-                    iconColor: Colors.red,
-                    onTap: _stopTimer,
-                  ),
-                  const SizedBox(width: 32),
-                  _buildControlCircle(
+                  _buildMinimalButton(
+                    onTap: () => _isRunning ? _pauseTimer() : _startTimer(),
                     icon: _isRunning ? Icons.pause : Icons.play_arrow,
-                    color: theme.colorScheme.primary,
-                    iconColor: Colors.white,
-                    size: 80,
-                    iconSize: 40,
-                    onTap: _isRunning ? _pauseTimer : _startTimer,
+                    label: _isRunning ? 'PAUSE' : 'RESUME',
                   ),
-                  const SizedBox(width: 32),
-                  _buildControlCircle(
-                    icon: Icons.music_note,
-                    color: theme.colorScheme.secondary.withOpacity(0.1),
-                    iconColor: theme.colorScheme.secondary,
-                    onTap: () {
-                      // Future: Ambient sound selector
-                    },
+                  const SizedBox(width: 48),
+                  _buildMinimalButton(
+                    onTap: _stopTimer,
+                    icon: Icons.close,
+                    label: 'END SESSION',
+                    isDestructive: true,
                   ),
                 ],
               ),
@@ -249,22 +242,36 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
     );
   }
 
-  Widget _buildControlCircle({
-    required IconData icon,
-    required Color color,
-    required Color iconColor,
+  Widget _buildMinimalButton({
     required VoidCallback onTap,
-    double size = 56,
-    double iconSize = 24,
+    required IconData icon,
+    required String label,
+    bool isDestructive = false,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(size / 2),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: Icon(icon, color: iconColor, size: iconSize),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: isDestructive
+                ? Colors.redAccent.withOpacity(0.8)
+                : Colors.white60,
+            size: 28,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDestructive
+                  ? Colors.redAccent.withOpacity(0.8)
+                  : Colors.white38,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }

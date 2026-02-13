@@ -1,9 +1,6 @@
 import '../models/domain_models.dart';
-import '../services/local_storage_service.dart';
 
 class FocusModeService {
-  final LocalStorageService _storageService = LocalStorageService();
-
   /// Inits the focus session. Future: Trigger DND via plugin.
   Future<void> startSession(EventEntity event) async {
     // Future: flutter_dnd.setDoNotDisturb(true);
@@ -21,8 +18,18 @@ class FocusModeService {
     // We'll leave the actual Hive calls in LocalStorageService but call them from here.
   }
 
-  /// Calculates the focus duration based on start and end times.
-  Duration calculateDuration(DateTime start, DateTime end) {
-    return end.difference(start);
+  static const List<String> motivationalPhrases = [
+    'Stay locked in.',
+    'Deep work only.',
+    'The future is built now.',
+    'Eyes on the prize.',
+    'Momentum is everything.',
+    'One block at a time.',
+    'Make it count.',
+    'Pure focus.',
+  ];
+
+  String getRandomPhrase() {
+    return (List<String>.from(motivationalPhrases)..shuffle()).first;
   }
 }

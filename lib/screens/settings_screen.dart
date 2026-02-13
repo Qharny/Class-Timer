@@ -21,6 +21,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _notificationsEnabled;
   late ThemeMode _themeMode;
 
+  // New settings state
+  late int _reminderMinutes;
+  late bool _contextMessagesEnabled;
+  late bool _autoFocusEnabled;
+  late String _syncProvider;
+
   @override
   void initState() {
     super.initState();
@@ -29,6 +35,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _nameController = TextEditingController(
       text: _storageService.getUserName(),
     );
+    _reminderMinutes = _storageService.getReminderMinutes();
+    _contextMessagesEnabled = _storageService.getContextMessagesEnabled();
+    _autoFocusEnabled = _storageService.getAutoFocusEnabled();
+    _syncProvider = _storageService.getSyncProvider();
   }
 
   @override
@@ -126,7 +136,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _toggleNotifications,
           ),
           const Divider(),
+          _buildSectionHeader(context, 'Smart Buffer'),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Reminder Timing'),
+            subtitle: Text('Notify me $_reminderMinutes minutes before'),
+            trailing: DropdownButton<int>(
+              value: _reminderMinutes,
+              underline: const SizedBox(),
+              items: [5, 10, 15]
+                  .map((m) => DropdownMenuItem(value: m, child: Text('$m min')))
+                  .toList(),
+              onChanged: (v) async {
+                if (v != null) {
+                  setState(() => _reminderMinutes = v);
+                  await _storageService.setReminderMinutes(v);
+                }
+              },
+            ),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Context Messages'),
+            subtitle: const Text('Show motivational nudges during study'),
+            value: _contextMessagesEnabled,
+            onChanged: (v) async {
+              setState(() => _contextMessagesEnabled = v);
+              await _storageService.setContextMessagesEnabled(v);
+            },
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.vibration),
+            title: const Text('Auto-Focus Mode'),
+            subtitle: const Text(
+              'Automatically enter Zen mode on session start',
+            ),
+            value: _autoFocusEnabled,
+            onChanged: (v) async {
+              setState(() => _autoFocusEnabled = v);
+              await _storageService.setAutoFocusEnabled(v);
+            },
+          ),
+          const Divider(),
+          _buildSectionHeader(context, 'Calendar Sync'),
+          ListTile(
+            leading: const Icon(Icons.sync),
+            title: const Text('Sync Provider'),
+            subtitle: Text(
+              _syncProvider == 'off' ? 'Disabled' : _syncProvider.toUpperCase(),
+            ),
+            onTap: _showSyncSelector,
+          ),
+          if (_syncProvider != 'off') ...[
+            ListTile(
+              leading: const Icon(Icons.account_circle_outlined),
+              title: const Text('Connected Account'),
+              subtitle: Text(_storageService.getConnectedAccount()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Last Sync'),
+              subtitle: Text(_storageService.getLastSyncTime() ?? 'Never'),
+              trailing: TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Re-syncing all events...')),
+                  );
+                },
+                child: const Text('RESYNC ALL'),
+              ),
+            ),
+          ],
+          const Divider(),
           _buildSectionHeader(context, 'Data Management'),
+          ListTile(
+            leading: const Icon(Icons.file_upload_outlined),
+            title: const Text('Export Timetable'),
+            subtitle: const Text('Download your schedule as CSV'),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Preparing export...')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.backup_outlined),
+            title: const Text('Cloud Backup'),
+            subtitle: const Text('Save your data to the cloud'),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Backup service coming soon.')),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.refresh),
             title: const Text('Reset Onboarding'),
@@ -148,6 +250,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             subtitle: const Text('Wipe everything from local storage'),
             onTap: _handleResetData,
+          ),
+          const Divider(),
+          _buildSectionHeader(context, 'Security & Privacy'),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Privacy Policy'),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Privacy Policy'),
+                  content: const SingleChildScrollView(
+                    child: Text(
+                      'Your data stays on your device. We do not collect or sell your personal information. Sync data is encrypted and sent directly to your provider.',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('CLOSE'),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const Divider(),
           _buildSectionHeader(context, 'About'),
@@ -223,6 +350,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (mode) {
                 _setThemeMode(mode);
                 Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSyncSelector() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Google Calendar'),
+              leading: const Icon(Icons.calendar_today),
+              onTap: () async {
+                setState(() => _syncProvider = 'google');
+                await _storageService.setSyncProvider('google');
+                await _storageService.setConnectedAccount(
+                  'scholar@university.edu',
+                );
+                if (mounted) Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Device Calendar'),
+              leading: const Icon(Icons.perm_contact_calendar_outlined),
+              onTap: () async {
+                setState(() => _syncProvider = 'device');
+                await _storageService.setSyncProvider('device');
+                await _storageService.setConnectedAccount('System Calendar');
+                if (mounted) Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Turn Off Sync'),
+              leading: const Icon(Icons.sync_disabled),
+              onTap: () async {
+                setState(() => _syncProvider = 'off');
+                await _storageService.setSyncProvider('off');
+                if (mounted) Navigator.pop(context);
               },
             ),
           ],

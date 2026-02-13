@@ -107,6 +107,55 @@ class LocalStorageService {
     await setOnboardingComplete(false); // Reset onboarding on full clear
   }
 
+  // New settings for Smart Buffer & Sync
+  int getReminderMinutes() {
+    return settingsBox.get('reminder_minutes', defaultValue: 15);
+  }
+
+  Future<void> setReminderMinutes(int minutes) async {
+    await settingsBox.put('reminder_minutes', minutes);
+  }
+
+  bool getContextMessagesEnabled() {
+    return settingsBox.get('context_messages_enabled', defaultValue: true);
+  }
+
+  Future<void> setContextMessagesEnabled(bool enabled) async {
+    await settingsBox.put('context_messages_enabled', enabled);
+  }
+
+  bool getAutoFocusEnabled() {
+    return settingsBox.get('auto_focus_enabled', defaultValue: false);
+  }
+
+  Future<void> setAutoFocusEnabled(bool enabled) async {
+    await settingsBox.put('auto_focus_enabled', enabled);
+  }
+
+  String getSyncProvider() {
+    return settingsBox.get('sync_provider', defaultValue: 'off');
+  }
+
+  Future<void> setSyncProvider(String provider) async {
+    await settingsBox.put('sync_provider', provider);
+  }
+
+  String? getLastSyncTime() {
+    return settingsBox.get('last_sync_time');
+  }
+
+  Future<void> setLastSyncTime(String time) async {
+    await settingsBox.put('last_sync_time', time);
+  }
+
+  String getConnectedAccount() {
+    return settingsBox.get('connected_account', defaultValue: 'Not connected');
+  }
+
+  Future<void> setConnectedAccount(String account) async {
+    await settingsBox.put('connected_account', account);
+  }
+
   // Helper methods
   Future<void> addClassEvent(ClassEvent event) async {
     await classBox.put(event.id, event);

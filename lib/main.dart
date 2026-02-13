@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
+import 'widgets/event_card.dart';
 
 import 'services/local_storage_service.dart';
 import 'screens/onboarding_screen.dart';
@@ -10,6 +12,7 @@ import 'theme/page_transitions.dart';
 import 'screens/focus_mode_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/event_detail_screen.dart';
+import 'screens/edit_event_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -102,6 +105,12 @@ class _ClassTimerProState extends State<ClassTimerPro> {
                   ),
                   settings: settings,
                 );
+              case '/edit-event':
+                final event = settings.arguments as ClassEvent?;
+                return RouteTransitions.slideBottom(
+                  page: EditEventScreen(event: event),
+                  settings: settings,
+                );
               default:
                 return null;
             }
@@ -122,11 +131,16 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final LocalStorageService _storageService = LocalStorageService();
   List<ClassEvent> _events = [];
+  late Stream<DateTime> _timerStream;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
+    _timerStream = Stream.periodic(
+      const Duration(seconds: 1),
+      (_) => DateTime.now(),
+    );
   }
 
   void _loadEvents() {
@@ -135,43 +149,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  String _getTodayFocusTime() {
-    final sessions = _storageService.getAllStudySessions();
-    final today = DateTime.now();
-    final todaySessions = sessions.where((s) {
-      return s.startTime.year == today.year &&
-          s.startTime.month == today.month &&
-          s.startTime.day == today.day;
-    });
-
-    int totalMinutes = 0;
-    for (var session in todaySessions) {
-      totalMinutes += session.endTime.difference(session.startTime).inMinutes;
-    }
-
-    if (totalMinutes == 0) return '0h';
-    if (totalMinutes < 60) {
-      return '${totalMinutes}m';
-    } else {
-      double hours = totalMinutes / 60.0;
-      return '${hours.toStringAsFixed(1)}h';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final upcomingEvent = _getUpNextEvent();
+    final upcomingEvents = _getUpcomingEvents(3);
     final todayEvents = _getTodayEvents();
     final userName = _storageService.getUserName();
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Dashboard'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_outlined),
             onPressed: () async {
               await Navigator.pushNamed(context, '/settings');
               _loadEvents();
@@ -180,46 +172,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Welcome back,', style: theme.textTheme.bodyLarge),
-            Text('$userName!', style: theme.textTheme.displayLarge),
-            const SizedBox(height: 30),
-
-            // Up Next Section
-            _buildSectionHeader(context, 'UP NEXT'),
-            const SizedBox(height: 12),
-            if (upcomingEvent != null)
-              _buildUpcomingCard(context, upcomingEvent)
-            else
-              _buildEmptyUpcomingCard(context),
-
+            // Top Section: Greeting & Date
+            _buildHeader(userName),
             const SizedBox(height: 32),
 
-            // Today's Schedule
-            _buildSectionHeader(context, 'TODAY\'S SCHEDULE'),
+            // Middle Section: Up Next
+            _buildSectionTitle('🔔 UP NEXT'),
             const SizedBox(height: 12),
-            if (todayEvents.isNotEmpty)
-              SizedBox(
-                height: 140,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: todayEvents.length,
-                  itemBuilder: (context, index) =>
-                      _buildScheduleCard(context, todayEvents[index]),
-                ),
+            if (_events.isEmpty)
+              _buildEmptyState(
+                'Add your timetable to get started.',
+                icon: Icons.calendar_today_outlined,
+                actionLabel: 'Import Now',
+                onAction: () async {
+                  await Navigator.pushNamed(context, '/import');
+                  _loadEvents();
+                },
               )
+            else if (upcomingEvents.isNotEmpty)
+              ...upcomingEvents.asMap().entries.map((entry) {
+                final isFirst = entry.key == 0;
+                return _buildUpNextCard(context, entry.value, isFirst);
+              })
             else
-              _buildEmptyScheduleCard(context),
+              _buildEmptyState('Nothing scheduled. Take a break.'),
 
             const SizedBox(height: 32),
 
-            // Quick Stats
-            _buildSectionHeader(context, 'QUICK STATS'),
+            // Bottom Section: Today's Schedule
+            _buildSectionTitle('📅 TODAY\'S SCHEDULE'),
             const SizedBox(height: 12),
-            _buildActionGrid(context, todayEvents.length),
+            if (_events.isNotEmpty)
+              if (todayEvents.isNotEmpty)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: todayEvents.length,
+                  itemBuilder: (context, index) {
+                    return EventCard(event: todayEvents[index]);
+                  },
+                )
+              else
+                _buildEmptyState('Nothing scheduled for today.')
+            else
+              const SizedBox.shrink(),
+
+            const SizedBox(height: 100), // Spacing for FAB
           ],
         ),
       ),
@@ -229,32 +231,256 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _loadEvents();
         },
         label: const Text('Add Timetable'),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
+        elevation: 2,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: Colors.white,
       ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildHeader(String name) {
+    final now = DateTime.now();
+    final hour = now.hour;
+    String greeting;
+    if (hour < 12) {
+      greeting = 'Good Morning';
+    } else if (hour < 17) {
+      greeting = 'Good Afternoon';
+    } else {
+      greeting = 'Good Evening';
+    }
+
+    final dateStr = DateFormat('EEEE, MMMM d').format(now);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          greeting,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        Text(
+          name,
+          style: Theme.of(
+            context,
+          ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          dateStr,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
     return Text(
       title,
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         fontWeight: FontWeight.bold,
         letterSpacing: 2,
-        color: Colors.grey,
+        color: Colors.grey[600],
       ),
     );
   }
 
-  ClassEvent? _getUpNextEvent() {
-    if (_events.isEmpty) return null;
+  Widget _buildUpNextCard(
+    BuildContext context,
+    ClassEvent event,
+    bool isFirst,
+  ) {
+    final theme = Theme.of(context);
 
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isFirst
+            ? theme.colorScheme.primary.withOpacity(0.05)
+            : theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isFirst
+              ? theme.colorScheme.primary.withOpacity(0.2)
+              : theme.dividerColor.withOpacity(0.1),
+        ),
+      ),
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EventDetailScreen(event: event),
+            ),
+          );
+          _loadEvents();
+        },
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _buildMiniBadge(
+                        event.type.toUpperCase(),
+                        theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          event.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${event.startTime} - ${event.endTime}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isFirst)
+              StreamBuilder<DateTime>(
+                stream: _timerStream,
+                builder: (context, snapshot) {
+                  return _buildCountdown(event.startTime);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountdown(String startTime) {
     final now = DateTime.now();
-    final currentDay = now.weekday; // 1-7 (Mon-Sun)
+    final parts = startTime.split(':');
+    final start = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
 
-    // Filter events for today and after current time
-    List<ClassEvent> potentialNext = _events.where((e) {
+    final diff = start.difference(now);
+    if (diff.isNegative) return const SizedBox.shrink();
+
+    final minutes = diff.inMinutes;
+    final seconds = diff.inSeconds % 60;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '${minutes}m ${seconds}s',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Courier',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(
+    String message, {
+    IconData? icon,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 48,
+              color: theme.colorScheme.primary.withOpacity(0.4),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: theme.hintColor,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: onAction,
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(actionLabel),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<ClassEvent> _getUpcomingEvents(int count) {
+    final now = DateTime.now();
+    final currentDay = now.weekday;
+    final todayEvents = _events.where((e) {
       if (e.dayOfWeek != currentDay) return false;
-
       final parts = e.startTime.split(':');
       final eventTime = DateTime(
         now.year,
@@ -266,13 +492,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return eventTime.isAfter(now);
     }).toList();
 
-    if (potentialNext.isEmpty) {
-      // Look for next day? For now, just return null if nothing today
-      return null;
-    }
-
-    potentialNext.sort((a, b) => a.startTime.compareTo(b.startTime));
-    return potentialNext.first;
+    todayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
+    return todayEvents.take(count).toList();
   }
 
   List<ClassEvent> _getTodayEvents() {
@@ -282,230 +503,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .toList();
     todayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
     return todayEvents;
-  }
-
-  Widget _buildEmptyUpcomingCard(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: const Padding(
-        padding: EdgeInsets.all(32.0),
-        child: Center(
-          child: Text(
-            'No more classes for today!',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyScheduleCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Text(
-        'Nothing scheduled for today.',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Colors.grey),
-      ),
-    );
-  }
-
-  Widget _buildUpcomingCard(BuildContext context, ClassEvent event) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EventDetailScreen(event: event),
-          ),
-        );
-        _loadEvents();
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Card(
-        elevation: 8,
-        shadowColor: theme.colorScheme.primary.withOpacity(0.2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary,
-                theme.colorScheme.primary.withRed(100),
-              ],
-            ),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${event.startTime} - ${event.endTime}',
-                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          event.venue,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.white),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScheduleCard(BuildContext context, ClassEvent event) {
-    final theme = Theme.of(context);
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            event.startTime,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            event.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const Spacer(),
-          Text(
-            event.venue,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionGrid(BuildContext context, int todayCount) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.2,
-      children: [
-        _buildStatCard(
-          context,
-          'Today\'s Classes',
-          '$todayCount',
-          Icons.calendar_view_day,
-          Colors.orange,
-        ),
-        _buildStatCard(
-          context,
-          'Total Classes',
-          '${_events.length}',
-          Icons.book,
-          Colors.teal,
-        ),
-        _buildStatCard(
-          context,
-          'Focus Time',
-          _getTodayFocusTime(),
-          Icons.timer,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          context,
-          'Productivity',
-          'High',
-          Icons.insights,
-          Colors.purple,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Card(
-      elevation: 0,
-      color: color.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const Spacer(),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            Text(
-              title,
-              style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
-              textAlign: TextAlign.start,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
