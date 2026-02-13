@@ -33,6 +33,22 @@ class _ImportScreenState extends State<ImportScreen> {
     }
   }
 
+  Future<void> _handlePickImage() async {
+    setState(() => _isLoading = true);
+    try {
+      final events = await _importService.pickAndParseImage();
+      setState(() {
+        _previewEvents = events;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error scanning image: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,12 +68,18 @@ class _ImportScreenState extends State<ImportScreen> {
         children: [
           const Icon(Icons.upload_file, size: 80, color: Colors.grey),
           const SizedBox(height: 20),
-          const Text('Upload your Excel timetable'),
+          const Text('Import your timetable'),
           const SizedBox(height: 40),
           ElevatedButton.icon(
+            onPressed: _handlePickImage,
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Scan Image (OCR)'),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
             onPressed: _handlePickFile,
-            icon: const Icon(Icons.add),
-            label: const Text('Select File'),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Select Excel File'),
           ),
         ],
       ),

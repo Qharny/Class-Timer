@@ -5,6 +5,10 @@ import '../models/class_event.dart';
 import '../models/study_session.dart';
 
 class LocalStorageService {
+  static final LocalStorageService _instance = LocalStorageService._internal();
+  factory LocalStorageService() => _instance;
+  LocalStorageService._internal();
+
   static const String classBoxName = 'class_events';
   static const String studyBoxName = 'study_sessions';
   static const String settingsBoxName = 'settings';

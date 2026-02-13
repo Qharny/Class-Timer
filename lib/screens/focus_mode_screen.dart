@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
+import '../models/study_session.dart';
+import '../services/local_storage_service.dart';
 
 class FocusModeScreen extends StatefulWidget {
   final ClassEvent event;
@@ -14,11 +16,15 @@ class FocusModeScreen extends StatefulWidget {
 class _FocusModeScreenState extends State<FocusModeScreen> {
   late Timer _timer;
   int _secondsRemaining = 0;
+  int _totalDurationSeconds = 0;
   bool _isRunning = false;
+  late DateTime _sessionStartTime;
+  final LocalStorageService _storageService = LocalStorageService();
 
   @override
   void initState() {
     super.initState();
+    _sessionStartTime = DateTime.now();
     _calculateInitialTime();
     _startTimer();
   }
@@ -39,9 +45,11 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
       int durationMinutes = endMinutes - startMinutes;
       if (durationMinutes <= 0) durationMinutes = 45; // Fallback
 
-      _secondsRemaining = durationMinutes * 60;
+      _totalDurationSeconds = durationMinutes * 60;
+      _secondsRemaining = _totalDurationSeconds;
     } catch (e) {
-      _secondsRemaining = 45 * 60; // 45 minutes default
+      _totalDurationSeconds = 45 * 60;
+      _secondsRemaining = _totalDurationSeconds; // 45 minutes default
     }
   }
 
@@ -57,6 +65,7 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
         setState(() {
           _isRunning = false;
         });
+        _saveSession(true);
         _showSessionComplete();
       }
     });
@@ -72,6 +81,21 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
   void _stopTimer() {
     _timer.cancel();
     _showStopConfirmation();
+  }
+
+  Future<void> _saveSession(bool completed) async {
+    final now = DateTime.now();
+    final session = StudySession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: widget.event.title,
+      linkedCourse: widget.event.id,
+      startTime: _sessionStartTime,
+      endTime: now,
+      focusModeEnabled: true,
+      completed: completed,
+    );
+
+    await _storageService.addStudySession(session);
   }
 
   void _showSessionComplete() {
@@ -108,9 +132,12 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back
+              await _saveSession(false);
+              if (mounted) {
+                Navigator.pop(context); // Go back
+              }
             },
             child: const Text('End'),
           ),
@@ -167,9 +194,9 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
                     width: 280,
                     height: 280,
                     child: CircularProgressIndicator(
-                      value:
-                          _secondsRemaining /
-                          (45 * 60), // Placeholder for max duration
+                      value: _totalDurationSeconds > 0
+                          ? _secondsRemaining / _totalDurationSeconds
+                          : 0,
                       strokeWidth: 12,
                       backgroundColor: theme.colorScheme.primary.withOpacity(
                         0.1,

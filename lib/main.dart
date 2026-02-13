@@ -135,6 +135,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  String _getTodayFocusTime() {
+    final sessions = _storageService.getAllStudySessions();
+    final today = DateTime.now();
+    final todaySessions = sessions.where((s) {
+      return s.startTime.year == today.year &&
+          s.startTime.month == today.month &&
+          s.startTime.day == today.day;
+    });
+
+    int totalMinutes = 0;
+    for (var session in todaySessions) {
+      totalMinutes += session.endTime.difference(session.startTime).inMinutes;
+    }
+
+    if (totalMinutes == 0) return '0h';
+    if (totalMinutes < 60) {
+      return '${totalMinutes}m';
+    } else {
+      double hours = totalMinutes / 60.0;
+      return '${hours.toStringAsFixed(1)}h';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -144,6 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Dashboard'),
         actions: [
           IconButton(
@@ -429,7 +453,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Icons.book,
           Colors.teal,
         ),
-        _buildStatCard(context, 'Focus Time', '0h', Icons.timer, Colors.blue),
+        _buildStatCard(
+          context,
+          'Focus Time',
+          _getTodayFocusTime(),
+          Icons.timer,
+          Colors.blue,
+        ),
         _buildStatCard(
           context,
           'Productivity',
