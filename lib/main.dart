@@ -13,6 +13,9 @@ import 'screens/focus_mode_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/event_detail_screen.dart';
 import 'screens/edit_event_screen.dart';
+import 'screens/program_setup_screen.dart';
+import 'screens/course_management_screen.dart';
+import 'screens/timetable_explorer_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,13 +28,16 @@ void main() async {
   await storageService.init();
 
   final bool onboardingComplete = storageService.isOnboardingComplete();
+  final program = storageService.getProgram();
   final themeMode = storageService.getThemeMode();
 
+  String initialRoute = '/';
+  if (onboardingComplete) {
+    initialRoute = (program == null) ? '/program-setup' : '/dashboard';
+  }
+
   runApp(
-    ClassTimerPro(
-      initialRoute: onboardingComplete ? '/dashboard' : '/',
-      initialThemeMode: themeMode,
-    ),
+    ClassTimerPro(initialRoute: initialRoute, initialThemeMode: themeMode),
   );
 }
 
@@ -103,6 +109,22 @@ class _ClassTimerProState extends State<ClassTimerPro> {
                       setState(() {}); // Refresh dashboard greeting
                     },
                   ),
+                  settings: settings,
+                );
+              case '/program-setup':
+                final isInitial = settings.arguments as bool? ?? true;
+                return RouteTransitions.fade(
+                  page: ProgramSetupScreen(isInitialSetup: isInitial),
+                  settings: settings,
+                );
+              case '/course-management':
+                return RouteTransitions.slideRight(
+                  page: const CourseManagementScreen(),
+                  settings: settings,
+                );
+              case '/timetable-explorer':
+                return RouteTransitions.slideRight(
+                  page: const TimetableExplorerScreen(),
                   settings: settings,
                 );
               case '/edit-event':

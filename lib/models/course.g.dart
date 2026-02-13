@@ -1,56 +1,50 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'class_event.dart';
+part of 'course.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ClassEventAdapter extends TypeAdapter<ClassEvent> {
+class CourseAdapter extends TypeAdapter<Course> {
   @override
-  final int typeId = 0;
+  final int typeId = 2;
 
   @override
-  ClassEvent read(BinaryReader reader) {
+  Course read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return ClassEvent(
+    return Course(
       id: fields[0] as String,
-      title: fields[1] as String,
-      type: fields[2] as String,
-      dayOfWeek: fields[3] as int,
-      startTime: fields[4] as String,
-      endTime: fields[5] as String,
-      venue: fields[6] as String,
-      calendarEventId: fields[7] as String?,
-      courseId: fields[8] as String?,
+      name: fields[1] as String,
+      code: fields[2] as String,
+      lecturer: fields[3] as String,
+      colorTag: fields[4] as String,
+      creditHours: fields[5] as int,
+      reminderMinutes: fields[6] as int,
     );
   }
 
   @override
-  void write(BinaryWriter writer, ClassEvent obj) {
+  void write(BinaryWriter writer, Course obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.title)
+      ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.type)
+      ..write(obj.code)
       ..writeByte(3)
-      ..write(obj.dayOfWeek)
+      ..write(obj.lecturer)
       ..writeByte(4)
-      ..write(obj.startTime)
+      ..write(obj.colorTag)
       ..writeByte(5)
-      ..write(obj.endTime)
+      ..write(obj.creditHours)
       ..writeByte(6)
-      ..write(obj.venue)
-      ..writeByte(7)
-      ..write(obj.calendarEventId)
-      ..writeByte(8)
-      ..write(obj.courseId);
+      ..write(obj.reminderMinutes);
   }
 
   @override
@@ -59,7 +53,7 @@ class ClassEventAdapter extends TypeAdapter<ClassEvent> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ClassEventAdapter &&
+      other is CourseAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

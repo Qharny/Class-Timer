@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
+import '../models/course.dart';
+import '../services/local_storage_service.dart';
 
 class EventCard extends StatelessWidget {
   final ClassEvent event;
@@ -11,6 +13,12 @@ class EventCard extends StatelessWidget {
     final theme = Theme.of(context);
     final status = _getEventStatus();
     final progress = _calculateProgress();
+    final course = event.courseId != null
+        ? LocalStorageService().getCourse(event.courseId!)
+        : null;
+    final courseColor = course != null
+        ? Color(int.parse(course.colorTag.replaceFirst('#', '0xFF')))
+        : theme.colorScheme.primary;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -32,14 +40,28 @@ class EventCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(
-                      event.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (course != null)
+                          Text(
+                            '${course.code} • ${course.name}'.toUpperCase(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: courseColor,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        Text(
+                          event.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  _buildStatusBadge(context, status),
+                  _buildStatusBadge(context, status, courseColor),
                 ],
               ),
               const SizedBox(height: 8),
@@ -88,13 +110,17 @@ class EventCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(BuildContext context, EventStatus status) {
+  Widget _buildStatusBadge(
+    BuildContext context,
+    EventStatus status,
+    Color baseColor,
+  ) {
     Color color;
     String label;
 
     switch (status) {
       case EventStatus.upcoming:
-        color = Colors.blue;
+        color = baseColor;
         label = 'Upcoming';
         break;
       case EventStatus.ongoing:

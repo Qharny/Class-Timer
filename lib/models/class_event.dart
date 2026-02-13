@@ -28,6 +28,9 @@ class ClassEvent extends HiveObject {
   @HiveField(7)
   late String? calendarEventId;
 
+  @HiveField(8)
+  late String? courseId;
+
   ClassEvent({
     required this.id,
     required this.title,
@@ -37,5 +40,6 @@ class ClassEvent extends HiveObject {
     required this.endTime,
     required this.venue,
     this.calendarEventId,
+    this.courseId,
   });
 }

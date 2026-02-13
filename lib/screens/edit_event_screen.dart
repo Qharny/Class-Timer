@@ -1,3 +1,4 @@
+import 'package:class_timer/models/course.dart';
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
 import '../services/local_storage_service.dart';
@@ -22,6 +23,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
   bool _remindersEnabled = true;
+  String? _selectedCourseId;
+  List<Course> _courses = [];
 
   @override
   void initState() {
@@ -31,6 +34,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _venueController = TextEditingController(text: e?.venue ?? '');
     _type = e?.type ?? 'class';
     _dayOfWeek = e?.dayOfWeek ?? DateTime.now().weekday;
+
+    _courses = _storageService.getAllCourses();
+    _selectedCourseId = e?.courseId;
 
     if (e != null) {
       _startTime = _parseTimeOfDay(e.startTime);
@@ -94,6 +100,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
         startTime: _formatTimeOfDay(_startTime),
         endTime: _formatTimeOfDay(_endTime),
         venue: _venueController.text,
+        courseId: _selectedCourseId,
       );
 
       await _storageService.addClassEvent(newEvent);
@@ -163,6 +170,27 @@ class _EditEventScreenState extends State<EditEventScreen> {
                 ),
               ],
               onChanged: (v) => setState(() => _type = v!),
+            ),
+            const SizedBox(height: 24),
+            DropdownButtonFormField<String>(
+              value: _selectedCourseId,
+              decoration: const InputDecoration(
+                labelText: 'Link to Course (Optional)',
+                prefixIcon: Icon(Icons.book_outlined),
+              ),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('No Course (General)'),
+                ),
+                ..._courses.map(
+                  (c) => DropdownMenuItem(
+                    value: c.id,
+                    child: Text('${c.code}: ${c.name}'),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _selectedCourseId = v),
             ),
             const SizedBox(height: 24),
             DropdownButtonFormField<int>(

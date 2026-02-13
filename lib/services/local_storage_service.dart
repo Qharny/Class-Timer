@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/class_event.dart';
 import '../models/study_session.dart';
+import '../models/course.dart';
+import '../models/program.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -12,6 +16,8 @@ class LocalStorageService {
   static const String classBoxName = 'class_events';
   static const String studyBoxName = 'study_sessions';
   static const String settingsBoxName = 'settings';
+  static const String courseBoxName = 'courses';
+  static const String programBoxName = 'program_profile';
   static const String _onboardingKey = 'onboarding_complete';
   static const String _firstTimeKey = 'is_first_time';
 
@@ -28,16 +34,26 @@ class LocalStorageService {
     if (!Hive.isAdapterRegistered(1)) {
       Hive.registerAdapter(StudySessionAdapter());
     }
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(CourseAdapter());
+    }
+    if (!Hive.isAdapterRegistered(3)) {
+      Hive.registerAdapter(ProgramAdapter());
+    }
 
     // Open Boxes
     await Hive.openBox<ClassEvent>(classBoxName);
     await Hive.openBox<StudySession>(studyBoxName);
     await Hive.openBox(settingsBoxName);
+    await Hive.openBox<Course>(courseBoxName);
+    await Hive.openBox<Program>(programBoxName);
   }
 
   Box<ClassEvent> get classBox => Hive.box<ClassEvent>(classBoxName);
   Box<StudySession> get studyBox => Hive.box<StudySession>(studyBoxName);
   Box get settingsBox => Hive.box(settingsBoxName);
+  Box<Course> get courseBox => Hive.box<Course>(courseBoxName);
+  Box<Program> get programBox => Hive.box<Program>(programBoxName);
 
   bool isOnboardingComplete() {
     return _prefs.getBool(_onboardingKey) ?? false;
@@ -154,6 +170,31 @@ class LocalStorageService {
 
   Future<void> setConnectedAccount(String account) async {
     await settingsBox.put('connected_account', account);
+  }
+
+  // Academic Hierarchy CRUD
+  Program? getProgram() {
+    return programBox.get('current_program');
+  }
+
+  Future<void> setProgram(Program program) async {
+    await programBox.put('current_program', program);
+  }
+
+  List<Course> getAllCourses() {
+    return courseBox.values.toList();
+  }
+
+  Course? getCourse(String id) {
+    return courseBox.get(id);
+  }
+
+  Future<void> addCourse(Course course) async {
+    await courseBox.put(course.id, course);
+  }
+
+  Future<void> deleteCourse(String id) async {
+    await courseBox.delete(id);
   }
 
   // Helper methods

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
+import '../models/course.dart';
 import '../services/local_storage_service.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -11,6 +12,12 @@ class EventDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isStudy = event.type == 'study';
+    final course = event.courseId != null
+        ? LocalStorageService().getCourse(event.courseId!)
+        : null;
+    final courseColor = course != null
+        ? Color(int.parse(course.colorTag.replaceFirst('#', '0xFF')))
+        : theme.colorScheme.primary;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -36,9 +43,9 @@ class EventDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(theme),
+            _buildHeader(theme, course, courseColor),
             const SizedBox(height: 32),
-            _buildInfoCards(theme),
+            _buildInfoCards(theme, course, courseColor),
             const SizedBox(height: 32),
             _buildSettingsSection(theme, isStudy),
             const SizedBox(height: 48),
@@ -50,25 +57,55 @@ class EventDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, Course? course, Color courseColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            event.type.toUpperCase(),
-            style: TextStyle(
-              color: theme.colorScheme.primary,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color:
+                    (course != null ? courseColor : theme.colorScheme.primary)
+                        .withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                event.type.toUpperCase(),
+                style: TextStyle(
+                  color: course != null
+                      ? courseColor
+                      : theme.colorScheme.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
-          ),
+            if (course != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  course.code,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 12),
         Text(
@@ -77,32 +114,55 @@ class EventDetailScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        if (course != null)
+          Text(
+            course.name,
+            style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
+          ),
       ],
     );
   }
 
-  Widget _buildInfoCards(ThemeData theme) {
-    return Row(
+  Widget _buildInfoCards(ThemeData theme, Course? course, Color courseColor) {
+    return Column(
       children: [
-        Expanded(
-          child: _buildInfoCard(
-            theme,
-            Icons.access_time_rounded,
-            'Time',
-            '${event.startTime} - ${event.endTime}',
-            _getDay(event.dayOfWeek),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildInfoCard(
+                theme,
+                Icons.access_time_rounded,
+                'Time',
+                '${event.startTime} - ${event.endTime}',
+                _getDay(event.dayOfWeek),
+                courseColor,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildInfoCard(
+                theme,
+                Icons.location_on_outlined,
+                'Venue',
+                event.venue.isEmpty ? 'Not Set' : event.venue,
+                'Campus Location',
+                courseColor,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildInfoCard(
+        if (course != null) ...[
+          const SizedBox(height: 16),
+          _buildInfoCard(
             theme,
-            Icons.location_on_outlined,
-            'Venue',
-            event.venue.isEmpty ? 'Not Set' : event.venue,
-            'Campus Location',
+            Icons.school_outlined,
+            'Academics',
+            '${course.creditHours} Credit Hours',
+            'Lecturer: ${course.lecturer}',
+            courseColor,
+            fullWidth: true,
           ),
-        ),
+        ],
       ],
     );
   }
@@ -113,8 +173,11 @@ class EventDetailScreen extends StatelessWidget {
     String label,
     String value,
     String subValue,
-  ) {
+    Color accentColor, {
+    bool fullWidth = false,
+  }) {
     return Container(
+      width: fullWidth ? double.infinity : null,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -124,7 +187,7 @@ class EventDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          Icon(icon, size: 20, color: accentColor),
           const SizedBox(height: 12),
           Text(
             label,
