@@ -3,7 +3,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
 import 'widgets/event_card.dart';
-
 import 'services/local_storage_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'models/class_event.dart';
@@ -176,6 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final theme = Theme.of(context);
     final upcomingEvents = _getUpcomingEvents(3);
     final todayEvents = _getTodayEvents();
+    final completedEvents = _getCompletedEvents(todayEvents);
     final userName = _storageService.getUserName();
 
     return Scaffold(
@@ -200,6 +200,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             // Top Section: Greeting & Date
             _buildHeader(userName),
+            const SizedBox(height: 24),
+
+            // Progress Section
+            _buildProgressCard(todayEvents.length, completedEvents.length),
+            const SizedBox(height: 32),
+
+            // Quick Actions Section
+            _buildSectionTitle('⚡ QUICK ACTIONS'),
+            const SizedBox(height: 12),
+            _buildQuickActions(),
             const SizedBox(height: 32),
 
             // Middle Section: Up Next
@@ -258,6 +268,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: Colors.white,
       ),
+    );
+  }
+
+  Widget _buildProgressCard(int total, int completed) {
+    final theme = Theme.of(context);
+    final double progress = total > 0 ? completed / total : 0.0;
+    final percent = (progress * 100).toInt();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Daily Progress',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$completed / $total Classes Done',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$percent%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _getMotivationMessage(progress),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getMotivationMessage(double progress) {
+    if (progress == 0) return "Ready to start your day? You've got this!";
+    if (progress < 0.5) return "Good start! Keep the momentum going.";
+    if (progress < 1.0) return "Almost there! Just a few more to go.";
+    return "Amazing! Daily schedule completed. Rest well!";
+  }
+
+  Widget _buildQuickActions() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      children: [
+        _buildActionItem(Icons.add_task_rounded, 'Add Class', () async {
+          await Navigator.pushNamed(context, '/edit-event');
+          _loadEvents();
+        }),
+        _buildActionItem(
+          Icons.explore_outlined,
+          'Explorer',
+          () => Navigator.pushNamed(context, '/timetable-explorer'),
+        ),
+        _buildActionItem(
+          Icons.auto_stories_outlined,
+          'Courses',
+          () => Navigator.pushNamed(context, '/course-management'),
+        ),
+        _buildActionItem(Icons.timer_outlined, 'Focus', () {
+          final upcoming = _getUpcomingEvents(1);
+          if (upcoming.isNotEmpty) {
+            Navigator.pushNamed(
+              context,
+              '/focus-mode',
+              arguments: upcoming.first,
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No upcoming classes to focus on')),
+            );
+          }
+        }),
+      ],
+    );
+  }
+
+  Widget _buildActionItem(IconData icon, String label, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 24),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w500,
+            fontSize: 10,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
@@ -525,5 +703,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .toList();
     todayEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
     return todayEvents;
+  }
+
+  List<ClassEvent> _getCompletedEvents(List<ClassEvent> todayEvents) {
+    final now = DateTime.now();
+    return todayEvents.where((e) {
+      final parts = e.endTime.split(':');
+      final eventEndTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+      );
+      return now.isAfter(eventEndTime);
+    }).toList();
   }
 }

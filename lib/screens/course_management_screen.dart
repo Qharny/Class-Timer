@@ -41,120 +41,130 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 24,
-          right: 24,
-          top: 24,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                isEditing ? 'Edit Course' : 'Add New Course',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Course Name'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: codeController,
-                decoration: const InputDecoration(labelText: 'Course Code'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: lecturerController,
-                decoration: const InputDecoration(labelText: 'Lecturer'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: creditHoursController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Credit Hours'),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Select ColorTag',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                children:
-                    [
-                          '#F44336',
-                          '#E91E63',
-                          '#9C27B0',
-                          '#673AB7',
-                          '#3F51B5',
-                          '#2196F3',
-                          '#00BCD4',
-                          '#009688',
-                          '#4CAF50',
-                          '#8BC34A',
-                          '#FFEB3B',
-                          '#FFC107',
-                          '#FF9800',
-                          '#FF5722',
-                        ]
-                        .map(
-                          (colorHex) => GestureDetector(
-                            onTap: () => setState(() => colorTag = colorHex),
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: Color(
-                                  int.parse(colorHex.replaceFirst('#', '0xFF')),
-                                ),
-                                shape: BoxShape.circle,
-                                border: colorTag == colorHex
-                                    ? Border.all(color: Colors.black, width: 2)
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.isEmpty) return;
-
-                  final newCourse = Course(
-                    id:
-                        course?.id ??
-                        DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text,
-                    code: codeController.text,
-                    lecturer: lecturerController.text,
-                    colorTag: colorTag,
-                    creditHours: int.tryParse(creditHoursController.text) ?? 3,
-                  );
-
-                  await _storageService.addCourse(newCourse);
-                  _loadCourses();
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  isEditing ? 'Edit Course' : 'Add New Course',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: Text(isEditing ? 'UPDATE COURSE' : 'ADD COURSE'),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Course Name'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeController,
+                  decoration: const InputDecoration(labelText: 'Course Code'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: lecturerController,
+                  decoration: const InputDecoration(labelText: 'Lecturer'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: creditHoursController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Credit Hours'),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Select ColorTag',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children:
+                      [
+                            '#F44336',
+                            '#E91E63',
+                            '#9C27B0',
+                            '#673AB7',
+                            '#3F51B5',
+                            '#2196F3',
+                            '#00BCD4',
+                            '#009688',
+                            '#4CAF50',
+                            '#8BC34A',
+                            '#FFEB3B',
+                            '#FFC107',
+                            '#FF9800',
+                            '#FF5722',
+                          ]
+                          .map(
+                            (colorHex) => GestureDetector(
+                              onTap: () =>
+                                  setSheetState(() => colorTag = colorHex),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Color(
+                                    int.parse(
+                                      colorHex.replaceFirst('#', '0xFF'),
+                                    ),
+                                  ),
+                                  shape: BoxShape.circle,
+                                  border: colorTag == colorHex
+                                      ? Border.all(
+                                          color: Colors.black,
+                                          width: 2,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.isEmpty) return;
+
+                    final newCourse = Course(
+                      id:
+                          course?.id ??
+                          DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: nameController.text,
+                      code: codeController.text,
+                      lecturer: lecturerController.text,
+                      colorTag: colorTag,
+                      creditHours:
+                          int.tryParse(creditHoursController.text) ?? 3,
+                    );
+
+                    await _storageService.addCourse(newCourse);
+                    _loadCourses();
+                    if (mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(isEditing ? 'UPDATE COURSE' : 'ADD COURSE'),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -189,14 +199,19 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                 );
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
+                  color: color.withOpacity(0.05),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: color.withOpacity(0.2)),
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: color.withOpacity(0.1),
+                      backgroundColor: color.withOpacity(0.15),
                       child: Text(
-                        course.code.substring(0, 2).toUpperCase(),
+                        course.code.isNotEmpty
+                            ? course.code.substring(0, 2).toUpperCase()
+                            : '??',
                         style: TextStyle(
                           color: color,
                           fontWeight: FontWeight.bold,
