@@ -6,6 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/class_event.dart';
 import '../models/domain_models.dart';
+import '../models/program.dart';
+import 'matrix_parser_service.dart';
+import 'local_storage_service.dart';
 
 class ImportService {
   /// Picks a file and parses it as Excel.
@@ -112,6 +115,55 @@ class ImportService {
     }
 
     return events;
+  }
+
+  /// Picks an Excel file and parses it using the Matrix Engine.
+  Future<List<ClassEvent>> pickAndParseMatrixExcel() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+    );
+
+    if (result == null || result.files.single.path == null) {
+      return [];
+    }
+
+    final file = File(result.files.single.path!);
+    final parsedEvents = await parseMatrixExcel(file);
+
+    return parsedEvents.map((pe) => _mapParsedToClassEvent(pe)).toList();
+  }
+
+  static Future<List<ParsedEvent>> parseMatrixExcel(File file) async {
+    final bytes = file.readAsBytesSync();
+    final excel = Excel.decodeBytes(bytes);
+    final parser = MatrixScheduleParserService();
+    final List<ParsedEvent> allEvents = [];
+
+    final profile = LocalStorageService().getProgram();
+
+    for (var table in excel.tables.keys) {
+      final rows = excel.tables[table]?.rows;
+      if (rows == null || rows.isEmpty) continue;
+
+      // Extract raw rows
+      final rawRows = rows.map((r) => r.map((c) => c?.value).toList()).toList();
+
+      final headerIndex = parser.detectTimeHeader(rawRows);
+      if (headerIndex == -1) continue;
+
+      final events = parser.buildEventsFromGrid(
+        day: table, // Sheet names are usually days
+        rows: rawRows,
+        headerIndex: headerIndex,
+        programFilter: profile?.name,
+        levelFilter: profile?.level,
+      );
+
+      allEvents.addAll(events);
+    }
+
+    return allEvents;
   }
 
   static int _dayToNum(String day) {
