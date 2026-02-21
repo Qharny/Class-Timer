@@ -598,7 +598,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          fontFamily: 'Courier',
         ),
       ),
     );

@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/class_event.dart';
 import '../models/domain_models.dart';
-import '../models/program.dart';
 import 'matrix_parser_service.dart';
 import 'local_storage_service.dart';
 
