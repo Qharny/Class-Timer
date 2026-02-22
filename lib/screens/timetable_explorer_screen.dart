@@ -292,13 +292,20 @@ class _TimetableExplorerScreenState extends State<TimetableExplorerScreen> {
                 ),
               ),
             ),
-            ...options.map(
-              (opt) => ListTile(
-                title: Text(opt.toUpperCase()),
-                onTap: () {
-                  onSelect(opt);
-                  Navigator.pop(context);
-                },
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: options.map(
+                    (opt) => ListTile(
+                      title: Text(opt.toUpperCase()),
+                      onTap: () {
+                        onSelect(opt);
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ).toList(),
+                ),
               ),
             ),
           ],

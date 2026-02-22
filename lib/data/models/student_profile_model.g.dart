@@ -1,47 +1,41 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'program.dart';
+part of 'student_profile_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ProgramAdapter extends TypeAdapter<Program> {
+class StudentProfileModelAdapter extends TypeAdapter<StudentProfileModel> {
   @override
-  final int typeId = 3;
+  final int typeId = 1;
 
   @override
-  Program read(BinaryReader reader) {
+  StudentProfileModel read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Program(
-      institution: fields[0] as String,
-      name: fields[1] as String,
-      level: fields[2] as String,
-      semester: fields[3] as int,
-      department: fields[4] as String?,
-      group: fields[5] as String?,
+    return StudentProfileModel(
+      programCode: fields[0] as String,
+      level: fields[1] as String,
+      department: fields[2] as String,
+      faculty: fields[3] as String,
     );
   }
 
   @override
-  void write(BinaryWriter writer, Program obj) {
+  void write(BinaryWriter writer, StudentProfileModel obj) {
     writer
-      ..writeByte(6)
-      ..writeByte(0)
-      ..write(obj.institution)
-      ..writeByte(1)
-      ..write(obj.name)
-      ..writeByte(2)
-      ..write(obj.level)
-      ..writeByte(3)
-      ..write(obj.semester)
       ..writeByte(4)
+      ..writeByte(0)
+      ..write(obj.programCode)
+      ..writeByte(1)
+      ..write(obj.level)
+      ..writeByte(2)
       ..write(obj.department)
-      ..writeByte(5)
-      ..write(obj.group);
+      ..writeByte(3)
+      ..write(obj.faculty);
   }
 
   @override
@@ -50,7 +44,7 @@ class ProgramAdapter extends TypeAdapter<Program> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ProgramAdapter &&
+      other is StudentProfileModelAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
