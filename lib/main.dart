@@ -15,6 +15,7 @@ import 'screens/edit_event_screen.dart';
 import 'screens/program_setup_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/timetable_explorer_screen.dart';
+import 'models/user_productivity.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -170,6 +171,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  UserProductivity _getStats() {
+    return _storageService.getUserProductivity();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -198,8 +203,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Section: Greeting & Date
-            _buildHeader(userName),
+            // Top Section: Greeting & Date & Streak
+            _buildHeader(userName, _getStats()),
             const SizedBox(height: 24),
 
             // Progress Section
@@ -210,6 +215,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildSectionTitle('⚡ QUICK ACTIONS'),
             const SizedBox(height: 12),
             _buildQuickActions(),
+            const SizedBox(height: 32),
+
+            // Streak Milestones Section
+            if (_getStats().currentStreak > 0) ...[
+              _buildSectionTitle('🏆 STREAK MILESTONES'),
+              const SizedBox(height: 12),
+              _buildMilestones(_getStats()),
+              const SizedBox(height: 32),
+            ],
+
+            // Analytics Section
+            _buildSectionTitle('📊 PRODUCTIVITY ANALYTICS'),
+            const SizedBox(height: 12),
+            _buildAnalyticsCard(_getStats()),
             const SizedBox(height: 32),
 
             // Middle Section: Up Next
@@ -439,7 +458,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHeader(String name) {
+  Widget _buildHeader(String name, UserProductivity stats) {
     final now = DateTime.now();
     final hour = now.hour;
     String greeting;
@@ -453,29 +472,203 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final dateStr = DateFormat('EEEE, MMMM d').format(now);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          greeting,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w400,
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              greeting,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            Text(
+              name,
+              style: Theme.of(
+                context,
+              ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              dateStr,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
+        if (stats.currentStreak > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Text('🔥', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 8),
+                Text(
+                  '${stats.currentStreak}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMilestones(UserProductivity stats) {
+    final theme = Theme.of(context);
+    final streak = stats.currentStreak;
+
+    final milestones = [
+      {
+        'days': 3,
+        'label': 'Getting Started',
+        'icon': Icons.star_border_rounded,
+      },
+      {
+        'days': 7,
+        'label': 'Consistency Builder',
+        'icon': Icons.trending_up_rounded,
+      },
+      {
+        'days': 30,
+        'label': 'Academic Machine',
+        'icon': Icons.precision_manufacturing_rounded,
+      },
+      {'days': 100, 'label': 'Unstoppable', 'icon': Icons.auto_awesome_rounded},
+    ];
+
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: milestones.length,
+        itemBuilder: (context, index) {
+          final m = milestones[index];
+          final days = m['days'] as int;
+          final isUnlocked = streak >= days;
+
+          return Container(
+            width: 140,
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isUnlocked
+                  ? theme.colorScheme.primary.withOpacity(0.1)
+                  : theme.cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isUnlocked
+                    ? theme.colorScheme.primary.withOpacity(0.3)
+                    : theme.dividerColor.withOpacity(0.1),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  m['icon'] as IconData,
+                  color: isUnlocked ? theme.colorScheme.primary : Colors.grey,
+                  size: 24,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  m['label'] as String,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: isUnlocked
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isUnlocked
+                        ? theme.colorScheme.primary
+                        : Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$days Days',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: isUnlocked ? theme.colorScheme.primary : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsCard(UserProductivity stats) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildAnalyticItem(
+            'Longest Streak',
+            '${stats.longestStreak}',
+            Icons.emoji_events_outlined,
+            Colors.amber,
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: theme.dividerColor.withOpacity(0.1),
+          ),
+          _buildAnalyticItem(
+            'Total Sessions',
+            '${stats.totalCompletedSessions}',
+            Icons.check_circle_outline_rounded,
+            Colors.green,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
         Text(
-          name,
-          style: Theme.of(
-            context,
-          ).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold),
+          value,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
-          dateStr,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey,
-            letterSpacing: 0.5,
-          ),
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey),
         ),
       ],
     );

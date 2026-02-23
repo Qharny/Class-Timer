@@ -97,20 +97,58 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
     );
 
     await _storageService.addStudySession(session);
+    if (completed) {
+      await _storageService.updateStreak();
+    }
   }
 
   void _showSessionComplete() {
+    final stats = _storageService.getUserProductivity();
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Session Complete!'),
-        content: const Text('Great job staying focused.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Great job staying focused.'),
+            if (stats.currentStreak > 0) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 24)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${stats.currentStreak} Day Streak!',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back
+              Navigator.pop(context, true); // Go back with success
             },
             child: const Text('Return'),
           ),

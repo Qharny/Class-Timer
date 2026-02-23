@@ -56,8 +56,9 @@ class MatrixScheduleParserService {
         }
 
         // Apply filtering if provided
-        if (programFilter != null && !cellContent.contains(programFilter))
+        if (programFilter != null && !cellContent.contains(programFilter)) {
           continue;
+        }
         if (levelFilter != null && !cellContent.contains(levelFilter)) continue;
 
         final timeRange = timeSlots[j];

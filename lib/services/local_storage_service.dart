@@ -6,6 +6,7 @@ import '../models/class_event.dart';
 import '../models/study_session.dart';
 import '../models/course.dart';
 import '../models/program.dart';
+import '../models/user_productivity.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -17,6 +18,7 @@ class LocalStorageService {
   static const String settingsBoxName = 'settings';
   static const String courseBoxName = 'courses';
   static const String programBoxName = 'program_profile';
+  static const String productivityBoxName = 'user_productivity';
   static const String _onboardingKey = 'onboarding_complete';
   static const String _firstTimeKey = 'is_first_time';
 
@@ -39,6 +41,9 @@ class LocalStorageService {
     if (!Hive.isAdapterRegistered(3)) {
       Hive.registerAdapter(ProgramAdapter());
     }
+    if (!Hive.isAdapterRegistered(4)) {
+      Hive.registerAdapter(UserProductivityAdapter());
+    }
 
     // Open Boxes
     await Hive.openBox<ClassEvent>(classBoxName);
@@ -46,6 +51,7 @@ class LocalStorageService {
     await Hive.openBox(settingsBoxName);
     await Hive.openBox<Course>(courseBoxName);
     await Hive.openBox<Program>(programBoxName);
+    await Hive.openBox<UserProductivity>(productivityBoxName);
   }
 
   Box<ClassEvent> get classBox => Hive.box<ClassEvent>(classBoxName);
@@ -53,6 +59,8 @@ class LocalStorageService {
   Box get settingsBox => Hive.box(settingsBoxName);
   Box<Course> get courseBox => Hive.box<Course>(courseBoxName);
   Box<Program> get programBox => Hive.box<Program>(programBoxName);
+  Box<UserProductivity> get productivityBox =>
+      Hive.box<UserProductivity>(productivityBoxName);
 
   bool isOnboardingComplete() {
     return _prefs.getBool(_onboardingKey) ?? false;
@@ -215,5 +223,44 @@ class LocalStorageService {
 
   List<StudySession> getAllStudySessions() {
     return studyBox.values.toList();
+  }
+
+  // Productivity & Streak Logic
+  UserProductivity getUserProductivity() {
+    return productivityBox.get('stats', defaultValue: UserProductivity()) ??
+        UserProductivity();
+  }
+
+  Future<void> updateStreak() async {
+    final stats = getUserProductivity();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (stats.lastCompletedDate == null) {
+      stats.currentStreak = 1;
+    } else {
+      final lastDate = DateTime(
+        stats.lastCompletedDate!.year,
+        stats.lastCompletedDate!.month,
+        stats.lastCompletedDate!.day,
+      );
+      final difference = today.difference(lastDate).inDays;
+
+      if (difference == 1) {
+        stats.currentStreak += 1;
+      } else if (difference > 1) {
+        stats.currentStreak = 1;
+      }
+      // If difference == 0 (same day), do nothing to streak
+    }
+
+    if (stats.currentStreak > stats.longestStreak) {
+      stats.longestStreak = stats.currentStreak;
+    }
+
+    stats.lastCompletedDate = today;
+    stats.totalCompletedSessions += 1;
+
+    await productivityBox.put('stats', stats);
   }
 }

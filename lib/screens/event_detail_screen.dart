@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
 import '../models/course.dart';
+import '../models/study_session.dart';
 import '../services/local_storage_service.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -289,7 +290,7 @@ class EventDetailScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context, ThemeData theme) {
     return Column(
       children: [
-        if (event.type == 'study')
+        if (event.type == 'study') ...[
           SizedBox(
             width: double.infinity,
             height: 54,
@@ -304,6 +305,23 @@ class EventDetailScreen extends StatelessWidget {
               child: const Text('Start Focus Session'),
             ),
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: () => _markAsCompleted(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text('Mark as Completed'),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
@@ -346,6 +364,46 @@ class EventDetailScreen extends StatelessWidget {
         return 'Sunday';
       default:
         return '';
+    }
+  }
+
+  Future<void> _markAsCompleted(BuildContext context) async {
+    final storageService = LocalStorageService();
+    final now = DateTime.now();
+
+    final session = StudySession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: event.title,
+      linkedCourse: event.id,
+      startTime: now.subtract(const Duration(hours: 1)), // Approximate
+      endTime: now,
+      focusModeEnabled: false,
+      completed: true,
+    );
+
+    await storageService.addStudySession(session);
+    await storageService.updateStreak();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Text('🔥 Streak Updated!'),
+              const Spacer(),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'View',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      Navigator.pop(context);
     }
   }
 
