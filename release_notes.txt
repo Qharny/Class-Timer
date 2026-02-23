@@ -1,0 +1,25 @@
+Class Timer Pro - Release Notes v1.0.0
+
+What's New:
+-----------
+* Enhanced Notifications:
+  - Added "Notification Sound" toggle in Settings to control alert audio.
+  - Introduced "Alarm Mode" for high-priority class reminders.
+  - Improved notification categorization for better reliability.
+
+* Performance & Stability:
+  - Optimized app size with R8 minification and custom ProGuard rules.
+  - Fixed various build configuration issues for smoother deployment.
+  - Updated application ID for official Play Store release.
+
+* Production Ready:
+  - Configured secure release signing workflow.
+  - Implemented ProGuard rules for ML Kit and Play Store services.
+
+---
+
+Short Version:
+--------------
+* New: Added Sound and Alarm Mode settings for class reminders.
+* Fixed: Resolved release build and minification (R8) errors.
+* Build: Signed and optimized for Google Play Store release.

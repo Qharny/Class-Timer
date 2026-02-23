@@ -1,0 +1,26 @@
+Class Timer Pro - Store Listing Details
+
+Short Description (Max 80 characters):
+--------------------------------------
+Stay organized with the ultimate student timetable, smart alerts & study tracker.
+
+Full Description:
+-----------------
+Welcome to Class Timer Pro – your ultimate academic companion designed to help you master your schedule and boost productivity. 
+
+Whether you're juggling multiple courses, tracking attendance, or building a consistent study habit, Class Timer Pro has everything you need to stay on top of your academic life.
+
+Key Features:
+- Smart Timetable Management: Easily import and organize your weekly classes, labs, and tutorials.
+- Advanced Notifications: Stay ahead with customizable reminders. Now includes "Alarm Mode" for high-priority alerts and configurable notification sounds.
+- Study Streaks & Gamification: Build discipline with our streak system. Earn coins for consistent study sessions and unlock rewards like streak freezes.
+- Attendance Tracking: Keep a record of your presence in every class and monitor your attendance percentage automatically.
+- Smart Buffer Alerts: Get notified exactly when you need to start moving to your next venue based on your custom buffer time.
+- Academic Program Profile: Store your program details, course codes, and unit information in one secure location.
+- Dark Mode & Premium UI: Enjoy a sleek, modern interface designed for focus and ease of use.
+
+Stop worrying about missing classes and start focusing on your academic success. Download Class Timer Pro today and take control of your student journey!
+
+Permission Usage (READ_MEDIA_IMAGES):
+------------------------------------
+We use this permission to allow you to upload images of your class timetable. Our app then uses smart text recognition (OCR) to automatically extract your schedule, saving you the time of manual entry. (203 chars)
