@@ -34,6 +34,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _reminderWrapUp;
   late bool _streakReminder;
   late bool _dailyMotivation;
+  late bool _notificationSound;
+  late bool _alarmMode;
 
   @override
   void initState() {
@@ -53,6 +55,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _reminderWrapUp = _storageService.getReminderEnabled('reminder_wrap_up');
     _streakReminder = _storageService.getReminderEnabled('streak_reminder');
     _dailyMotivation = _storageService.getReminderEnabled('daily_motivation');
+    _notificationSound = _storageService.getNotificationSoundEnabled();
+    _alarmMode = _storageService.getAlarmModeEnabled();
   }
 
   @override
@@ -217,6 +221,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'daily_motivation',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
+                    },
+                  ),
+                  const Divider(indent: 16),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.volume_up_outlined),
+                    title: const Text('Notification Sound'),
+                    subtitle: const Text('Play sound on alerts'),
+                    value: _notificationSound,
+                    onChanged: (v) async {
+                      setState(() => _notificationSound = v);
+                      await _storageService.setNotificationSoundEnabled(v);
+                      await NotificationService().init(); // Update channel
+                      await NotificationService().rescheduleAll();
+                    },
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.alarm_on_outlined),
+                    title: const Text('Alarm Mode'),
+                    subtitle: const Text('High priority notifications'),
+                    value: _alarmMode,
+                    onChanged: (v) async {
+                      setState(() => _alarmMode = v);
+                      await _storageService.setAlarmModeEnabled(v);
+                      await NotificationService().init(); // Update channel
                       await NotificationService().rescheduleAll();
                     },
                   ),

@@ -9,6 +9,10 @@ class NotificationService {
   NotificationService._internal();
 
   Future<void> init() async {
+    final storage = LocalStorageService();
+    final bool playSound = storage.getNotificationSoundEnabled();
+    final bool alarmMode = storage.getAlarmModeEnabled();
+
     await AwesomeNotifications().initialize('resource://mipmap/launcher_icon', [
       NotificationChannel(
         channelKey: 'class_reminders',
@@ -16,10 +20,12 @@ class NotificationService {
         channelDescription: 'Notifications for class start times',
         defaultColor: const Color(0xFF9D50BB),
         ledColor: Colors.white,
-        importance: NotificationImportance.High,
+        importance: alarmMode
+            ? NotificationImportance.Max
+            : NotificationImportance.High,
         channelShowBadge: true,
         onlyAlertOnce: true,
-        playSound: true,
+        playSound: playSound,
         criticalAlerts: true,
       ),
       NotificationChannel(
@@ -30,6 +36,7 @@ class NotificationService {
         ledColor: Colors.orange,
         importance: NotificationImportance.High,
         channelShowBadge: true,
+        playSound: playSound,
       ),
       NotificationChannel(
         channelKey: 'engagement_nudges',
@@ -38,6 +45,7 @@ class NotificationService {
         defaultColor: const Color(0xFF4CAF50),
         ledColor: Colors.green,
         importance: NotificationImportance.Default,
+        playSound: playSound,
       ),
     ], debug: true);
   }
@@ -77,6 +85,9 @@ class NotificationService {
         title: '${crisisPrefix}Class Buffer Alert',
         body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
         notificationLayout: NotificationLayout.Default,
+        category: storage.getAlarmModeEnabled()
+            ? NotificationCategory.Alarm
+            : NotificationCategory.Reminder,
       ),
       schedule: NotificationCalendar(
         weekday: event.dayOfWeek,
@@ -110,6 +121,9 @@ class NotificationService {
           title: 'Class Starting Soon',
           body: 'You have 15 minutes until ${event.title} at ${event.venue}.',
           notificationLayout: NotificationLayout.Default,
+          category: storage.getAlarmModeEnabled()
+              ? NotificationCategory.Alarm
+              : NotificationCategory.Reminder,
         ),
         schedule: NotificationCalendar(
           weekday: event.dayOfWeek,
@@ -143,6 +157,9 @@ class NotificationService {
           title: 'Move Now!',
           body: 'Time to head to ${event.venue}. Class starts in 5 minutes.',
           notificationLayout: NotificationLayout.Default,
+          category: storage.getAlarmModeEnabled()
+              ? NotificationCategory.Alarm
+              : NotificationCategory.Reminder,
         ),
         schedule: NotificationCalendar(
           weekday: event.dayOfWeek,

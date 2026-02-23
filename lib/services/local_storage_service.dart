@@ -182,6 +182,22 @@ class LocalStorageService {
     await settingsBox.put('auto_focus_enabled', enabled);
   }
 
+  bool getNotificationSoundEnabled() {
+    return settingsBox.get('notification_sound', defaultValue: true);
+  }
+
+  Future<void> setNotificationSoundEnabled(bool enabled) async {
+    await settingsBox.put('notification_sound', enabled);
+  }
+
+  bool getAlarmModeEnabled() {
+    return settingsBox.get('alarm_mode', defaultValue: false);
+  }
+
+  Future<void> setAlarmModeEnabled(bool enabled) async {
+    await settingsBox.put('alarm_mode', enabled);
+  }
+
   String getSyncProvider() {
     return settingsBox.get('sync_provider', defaultValue: 'off');
   }
