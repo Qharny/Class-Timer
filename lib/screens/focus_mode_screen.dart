@@ -27,7 +27,9 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
     super.initState();
     _sessionStartTime = DateTime.now();
     _calculateInitialTime();
-    _startTimer();
+    if (_storageService.getAutoFocusEnabled()) {
+      _startTimer();
+    }
   }
 
   void _calculateInitialTime() {
@@ -235,21 +237,22 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
                   ),
                   const SizedBox(height: 24),
                   // Motivational Micro-text
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 500),
-                    child: Text(
-                      focusService.getRandomPhrase(),
-                      key: ValueKey(
-                        _secondsRemaining ~/ 10,
-                      ), // Change every 10s
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: 1.2,
+                  if (_storageService.getContextMessagesEnabled())
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 500),
+                      child: Text(
+                        focusService.getRandomPhrase(),
+                        key: ValueKey(
+                          _secondsRemaining ~/ 10,
+                        ), // Change every 10s
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 16,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
 

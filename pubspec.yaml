@@ -47,8 +47,9 @@ dependencies:
   shared_preferences: ^2.5.4
   google_mlkit_text_recognition: ^0.14.0
   image_picker: ^1.1.2
-  flutter_local_notifications: ^21.0.0-dev.2
-  timezone: ^0.11.0
+  awesome_notifications: ^0.10.1
+  timezone: ^0.9.4
+  device_calendar: ^4.3.2
 
 dev_dependencies:
   flutter_test:

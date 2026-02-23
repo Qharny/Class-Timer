@@ -8,6 +8,7 @@ import '../models/course.dart';
 import '../models/program.dart';
 import '../models/user_productivity.dart';
 import 'notification_service.dart';
+import 'calendar_sync_service.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -214,9 +215,14 @@ class LocalStorageService {
   Future<void> addClassEvent(ClassEvent event) async {
     await classBox.put(event.id, event);
     await NotificationService().scheduleClassReminders(event);
+    await CalendarSyncService().syncEvent(event);
   }
 
   Future<void> deleteClassEvent(String id) async {
+    final event = classBox.get(id);
+    if (event?.calendarEventId != null) {
+      await CalendarSyncService().deleteEvent(event!.calendarEventId!);
+    }
     await NotificationService().cancelNotificationsForEvent(id);
     await classBox.delete(id);
   }

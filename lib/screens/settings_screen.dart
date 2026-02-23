@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/local_storage_service.dart';
+import '../services/notification_service.dart';
+import '../services/calendar_sync_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback onThemeChanged;
@@ -64,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _notificationsEnabled = value;
     });
     await _storageService.setNotificationsEnabled(value);
+    await NotificationService().rescheduleAll();
   }
 
   void _setThemeMode(ThemeMode? mode) async {
@@ -162,6 +165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'reminder_15_min',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
                     },
                   ),
                   SwitchListTile(
@@ -174,6 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'reminder_5_min',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
                     },
                   ),
                   SwitchListTile(
@@ -186,6 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'reminder_wrap_up',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
                     },
                   ),
                   SwitchListTile(
@@ -198,6 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'streak_reminder',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
                     },
                   ),
                   SwitchListTile(
@@ -210,6 +217,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'daily_motivation',
                         v,
                       );
+                      await NotificationService().rescheduleAll();
                     },
                   ),
                 ],
@@ -232,6 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (v != null) {
                   setState(() => _reminderMinutes = v);
                   await _storageService.setReminderMinutes(v);
+                  await NotificationService().rescheduleAll();
                 }
               },
             ),
@@ -265,7 +274,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Academic Program'),
             subtitle: const Text('Institution, Program, Level'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.pushNamed(context, '/edit-program'),
+            onTap: () => Navigator.pushNamed(
+              context,
+              '/program-setup',
+              arguments: false,
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.book_outlined),
@@ -302,10 +315,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Last Sync'),
               subtitle: Text(_storageService.getLastSyncTime() ?? 'Never'),
               trailing: TextButton(
-                onPressed: () {
+                onPressed: () async {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Re-syncing all events...')),
                   );
+                  final events = _storageService.getAllClassEvents();
+                  for (final event in events) {
+                    await CalendarSyncService().syncEvent(event);
+                  }
+                  await _storageService.setLastSyncTime(
+                    DateTime.now().toString(),
+                  );
+                  setState(() {});
                 },
                 child: const Text('RESYNC ALL'),
               ),
@@ -475,8 +496,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () async {
                 setState(() => _syncProvider = 'google');
                 await _storageService.setSyncProvider('google');
-                await _storageService.setConnectedAccount(
-                  'scholar@university.edu',
+                await _storageService.setConnectedAccount('Google Calendar');
+
+                // Initial Sync
+                final events = _storageService.getAllClassEvents();
+                for (final event in events) {
+                  await CalendarSyncService().syncEvent(event);
+                }
+                await _storageService.setLastSyncTime(
+                  DateTime.now().toString().split('.')[0],
                 );
                 if (mounted) Navigator.pop(context);
               },
@@ -487,7 +515,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () async {
                 setState(() => _syncProvider = 'device');
                 await _storageService.setSyncProvider('device');
-                await _storageService.setConnectedAccount('System Calendar');
+                await _storageService.setConnectedAccount('Device Calendar');
+
+                // Initial Sync
+                final events = _storageService.getAllClassEvents();
+                for (final event in events) {
+                  await CalendarSyncService().syncEvent(event);
+                }
+                await _storageService.setLastSyncTime(
+                  DateTime.now().toString().split('.')[0],
+                );
                 if (mounted) Navigator.pop(context);
               },
             ),

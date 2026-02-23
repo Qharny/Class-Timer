@@ -1,7 +1,5 @@
-import 'dart:io';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter/material.dart';
 import '../models/class_event.dart';
 import '../services/local_storage_service.dart';
 
@@ -10,34 +8,44 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
   Future<void> init() async {
-    tz.initializeTimeZones();
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-
-    await _notificationsPlugin.initialize(
-      settings: initializationSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // Handle notification tap if needed
-      },
-    );
+    await AwesomeNotifications().initialize('resource://mipmap/launcher_icon', [
+      NotificationChannel(
+        channelKey: 'class_reminders',
+        channelName: 'Class Reminders',
+        channelDescription: 'Notifications for class start times',
+        defaultColor: const Color(0xFF9D50BB),
+        ledColor: Colors.white,
+        importance: NotificationImportance.High,
+        channelShowBadge: true,
+        onlyAlertOnce: true,
+        playSound: true,
+        criticalAlerts: true,
+      ),
+      NotificationChannel(
+        channelKey: 'streak_reminders',
+        channelName: 'Streak & Motivation',
+        channelDescription: 'Daily reminders to keep your streak alive',
+        defaultColor: const Color(0xFFFF5722),
+        ledColor: Colors.orange,
+        importance: NotificationImportance.High,
+        channelShowBadge: true,
+      ),
+      NotificationChannel(
+        channelKey: 'engagement_nudges',
+        channelName: 'Engagement Nudges',
+        channelDescription: 'Gentle reminders to return to your studies',
+        defaultColor: const Color(0xFF4CAF50),
+        ledColor: Colors.green,
+        importance: NotificationImportance.Default,
+      ),
+    ], debug: true);
   }
 
   Future<void> requestPermissions() async {
-    if (Platform.isAndroid) {
-      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >();
-      await androidImplementation?.requestNotificationsPermission();
+    bool isAllowed = await AwesomeNotifications().isNotificationAllowed();
+    if (!isAllowed) {
+      await AwesomeNotifications().requestPermissionToSendNotifications();
     }
   }
 
@@ -45,64 +53,136 @@ class NotificationService {
     final storage = LocalStorageService();
     if (!storage.getNotificationsEnabled()) return;
 
-    final now = DateTime.now();
+    // Smart Buffer Dynamic Reminder
+    final bufferMinutes = storage.getReminderMinutes();
     final parts = event.startTime.split(':');
-    final eventStart = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
 
-    DateTime scheduledDate = _getNextOccurrence(event.dayOfWeek, eventStart);
+    DateTime scheduledTime = DateTime(
+      2024,
+      1,
+      1,
+      hour,
+      minute,
+    ).subtract(Duration(minutes: bufferMinutes));
+
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: event.id.hashCode + 4, // unique offset for dynamic buffer
+        channelKey: 'class_reminders',
+        title: 'Class Buffer Alert',
+        body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
+        notificationLayout: NotificationLayout.Default,
+      ),
+      schedule: NotificationCalendar(
+        weekday: event.dayOfWeek,
+        hour: scheduledTime.hour,
+        minute: scheduledTime.minute,
+        second: 0,
+        millisecond: 0,
+        repeats: true,
+      ),
+    );
 
     // 15-minute Reminder
     if (storage.settingsBox.get('reminder_15_min', defaultValue: true)) {
-      final reminderTime = scheduledDate.subtract(const Duration(minutes: 15));
-      if (reminderTime.isAfter(now)) {
-        await _scheduleNotification(
+      final parts = event.startTime.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      // Calculate 15 mins before
+      DateTime dummy = DateTime(
+        2024,
+        1,
+        1,
+        hour,
+        minute,
+      ).subtract(const Duration(minutes: 15));
+
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
           id: event.id.hashCode + 1,
+          channelKey: 'class_reminders',
           title: 'Class Starting Soon',
           body: 'You have 15 minutes until ${event.title} at ${event.venue}.',
-          scheduledDate: reminderTime,
-        );
-      }
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule: NotificationCalendar(
+          weekday: event.dayOfWeek,
+          hour: dummy.hour,
+          minute: dummy.minute,
+          second: 0,
+          millisecond: 0,
+          repeats: true,
+        ),
+      );
     }
 
     // 5-minute Reminder
     if (storage.settingsBox.get('reminder_5_min', defaultValue: true)) {
-      final reminderTime = scheduledDate.subtract(const Duration(minutes: 5));
-      if (reminderTime.isAfter(now)) {
-        await _scheduleNotification(
+      final parts = event.startTime.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+
+      DateTime dummy = DateTime(
+        2024,
+        1,
+        1,
+        hour,
+        minute,
+      ).subtract(const Duration(minutes: 5));
+
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
           id: event.id.hashCode + 2,
+          channelKey: 'class_reminders',
           title: 'Move Now!',
           body: 'Time to head to ${event.venue}. Class starts in 5 minutes.',
-          scheduledDate: reminderTime,
-        );
-      }
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule: NotificationCalendar(
+          weekday: event.dayOfWeek,
+          hour: dummy.hour,
+          minute: dummy.minute,
+          second: 0,
+          millisecond: 0,
+          repeats: true,
+        ),
+      );
     }
 
     // Wrap-up Reminder
     if (storage.settingsBox.get('reminder_wrap_up', defaultValue: true)) {
       final endParts = event.endTime.split(':');
-      final eventEnd = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        int.parse(endParts[0]),
-        int.parse(endParts[1]),
-      );
-      final scheduledEnd = _getNextOccurrence(event.dayOfWeek, eventEnd);
-      final reminderTime = scheduledEnd.subtract(const Duration(minutes: 5));
-      if (reminderTime.isAfter(now)) {
-        await _scheduleNotification(
+      final hour = int.parse(endParts[0]);
+      final minute = int.parse(endParts[1]);
+
+      DateTime dummy = DateTime(
+        2024,
+        1,
+        1,
+        hour,
+        minute,
+      ).subtract(const Duration(minutes: 5));
+
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
           id: event.id.hashCode + 3,
+          channelKey: 'class_reminders',
           title: 'Wrap Up',
           body: '${event.title} is ending soon. Prepare for transition.',
-          scheduledDate: reminderTime,
-        );
-      }
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule: NotificationCalendar(
+          weekday: event.dayOfWeek,
+          hour: dummy.hour,
+          minute: dummy.minute,
+          second: 0,
+          millisecond: 0,
+          repeats: true,
+        ),
+      );
     }
   }
 
@@ -112,26 +192,22 @@ class NotificationService {
     if (!storage.settingsBox.get('streak_reminder', defaultValue: true)) return;
 
     final stats = storage.getUserProductivity();
-    final now = DateTime.now();
-    final reminderTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      20,
-      0,
-    ); // 8:00 PM
 
-    DateTime scheduledDate = reminderTime;
-    if (now.isAfter(reminderTime)) {
-      scheduledDate = reminderTime.add(const Duration(days: 1));
-    }
-
-    await _scheduleNotification(
-      id: 999,
-      title: '🔥 Streak At Risk',
-      body:
-          'Don\'t lose your ${stats.currentStreak}-day streak. Complete a session now!',
-      scheduledDate: scheduledDate,
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 999,
+        channelKey: 'streak_reminders',
+        title: '🔥 Streak At Risk',
+        body:
+            'Don\'t lose your ${stats.currentStreak}-day streak. Complete a session now!',
+      ),
+      schedule: NotificationCalendar(
+        hour: 20,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+        repeats: true,
+      ),
     );
   }
 
@@ -142,25 +218,20 @@ class NotificationService {
       return;
     }
 
-    final now = DateTime.now();
-    final reminderTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      7,
-      0,
-    ); // 7:00 AM
-
-    DateTime scheduledDate = reminderTime;
-    if (now.isAfter(reminderTime)) {
-      scheduledDate = reminderTime.add(const Duration(days: 1));
-    }
-
-    await _scheduleNotification(
-      id: 888,
-      title: 'Morning Motivation',
-      body: 'Consistency builds excellence. Ready for a new day of progress?',
-      scheduledDate: scheduledDate,
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 888,
+        channelKey: 'streak_reminders', // Using same channel for discipline
+        title: 'Morning Motivation',
+        body: 'Consistency builds excellence. Ready for a new day of progress?',
+      ),
+      schedule: NotificationCalendar(
+        hour: 7,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+        repeats: true,
+      ),
     );
   }
 
@@ -168,27 +239,34 @@ class NotificationService {
     final storage = LocalStorageService();
     if (!storage.getNotificationsEnabled()) return;
 
-    // Schedule for 48 hours from now
-    final scheduledDate = DateTime.now().add(const Duration(hours: 48));
-
-    await _scheduleNotification(
-      id: 777,
-      title: 'Your Timetable Misses You',
-      body:
-          'Consistency is key to academic success. Let\'s get back to your study goals!',
-      scheduledDate: scheduledDate,
+    // Engagement nudge is scheduled once for 48 hours later
+    // AwesomeNotifications doesn't have a simple "Duration" schedule that survives reboot as easily as Calendar
+    // but we can use NotificationInterval
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: 777,
+        channelKey: 'engagement_nudges',
+        title: 'Your Timetable Misses You',
+        body:
+            'Consistency is key to academic success. Let\'s get back to your study goals!',
+      ),
+      schedule: NotificationInterval(
+        interval: const Duration(hours: 48),
+        repeats: false,
+      ),
     );
   }
 
   Future<void> cancelNotificationsForEvent(String eventId) async {
     final baseId = eventId.hashCode;
-    await _notificationsPlugin.cancel(id: baseId + 1);
-    await _notificationsPlugin.cancel(id: baseId + 2);
-    await _notificationsPlugin.cancel(id: baseId + 3);
+    await AwesomeNotifications().cancel(baseId + 1);
+    await AwesomeNotifications().cancel(baseId + 2);
+    await AwesomeNotifications().cancel(baseId + 3);
+    await AwesomeNotifications().cancel(baseId + 4);
   }
 
   Future<void> rescheduleAll() async {
-    await _notificationsPlugin.cancelAll();
+    await AwesomeNotifications().cancelAllSchedules();
     final events = LocalStorageService().getAllClassEvents();
     for (final event in events) {
       await scheduleClassReminders(event);
@@ -203,56 +281,14 @@ class NotificationService {
     required String title,
     required String body,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
-      'instant_notifications',
-      'Instant Notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-    const details = NotificationDetails(android: androidDetails);
-    await _notificationsPlugin.show(
-      id: id,
-      title: title,
-      body: body,
-      notificationDetails: details,
-    );
-  }
-
-  Future<void> _scheduleNotification({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime scheduledDate,
-  }) async {
-    await _notificationsPlugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'class_timer_reminders',
-          'Class Timer Reminders',
-          channelDescription: 'Notifications for class and streak reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: id,
+        channelKey: 'streak_reminders', // Generic for milestones
+        title: title,
+        body: body,
+        notificationLayout: NotificationLayout.Default,
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
-  }
-
-  DateTime _getNextOccurrence(int dayOfWeek, DateTime eventTime) {
-    DateTime scheduledDate = eventTime;
-    while (scheduledDate.weekday != dayOfWeek) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-
-    if (scheduledDate.isBefore(DateTime.now())) {
-      scheduledDate = scheduledDate.add(const Duration(days: 7));
-    }
-
-    return scheduledDate;
   }
 }
