@@ -67,11 +67,14 @@ class NotificationService {
       minute,
     ).subtract(Duration(minutes: bufferMinutes));
 
+    final isCrisis = storage.isCrisisMode();
+    final crisisPrefix = isCrisis ? '🚨 [CRISIS MODE] ' : '';
+
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
         id: event.id.hashCode + 4, // unique offset for dynamic buffer
         channelKey: 'class_reminders',
-        title: 'Class Buffer Alert',
+        title: '${crisisPrefix}Class Buffer Alert',
         body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
         notificationLayout: NotificationLayout.Default,
       ),

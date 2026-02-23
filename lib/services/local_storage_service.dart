@@ -7,6 +7,7 @@ import '../models/study_session.dart';
 import '../models/course.dart';
 import '../models/program.dart';
 import '../models/user_productivity.dart';
+import '../models/attendance_record.dart';
 import 'notification_service.dart';
 import 'calendar_sync_service.dart';
 
@@ -21,6 +22,7 @@ class LocalStorageService {
   static const String courseBoxName = 'courses';
   static const String programBoxName = 'program_profile';
   static const String productivityBoxName = 'user_productivity';
+  static const String attendanceBoxName = 'attendance_records';
   static const String _onboardingKey = 'onboarding_complete';
   static const String _firstTimeKey = 'is_first_time';
 
@@ -46,6 +48,9 @@ class LocalStorageService {
     if (!Hive.isAdapterRegistered(4)) {
       Hive.registerAdapter(UserProductivityAdapter());
     }
+    if (!Hive.isAdapterRegistered(8)) {
+      Hive.registerAdapter(AttendanceRecordAdapter());
+    }
 
     // Open Boxes
     await Hive.openBox<ClassEvent>(classBoxName);
@@ -54,6 +59,7 @@ class LocalStorageService {
     await Hive.openBox<Course>(courseBoxName);
     await Hive.openBox<Program>(programBoxName);
     await Hive.openBox<UserProductivity>(productivityBoxName);
+    await Hive.openBox<AttendanceRecord>(attendanceBoxName);
   }
 
   Box<ClassEvent> get classBox => Hive.box<ClassEvent>(classBoxName);
@@ -63,6 +69,8 @@ class LocalStorageService {
   Box<Program> get programBox => Hive.box<Program>(programBoxName);
   Box<UserProductivity> get productivityBox =>
       Hive.box<UserProductivity>(productivityBoxName);
+  Box<AttendanceRecord> get attendanceBox =>
+      Hive.box<AttendanceRecord>(attendanceBoxName);
 
   bool isOnboardingComplete() {
     return _prefs.getBool(_onboardingKey) ?? false;
@@ -152,6 +160,14 @@ class LocalStorageService {
 
   Future<void> setContextMessagesEnabled(bool enabled) async {
     await settingsBox.put('context_messages_enabled', enabled);
+  }
+
+  bool isCrisisMode() {
+    return settingsBox.get('crisis_mode', defaultValue: false);
+  }
+
+  Future<void> setCrisisMode(bool enabled) async {
+    await settingsBox.put('crisis_mode', enabled);
   }
 
   bool getAutoFocusEnabled() {
@@ -252,6 +268,7 @@ class LocalStorageService {
 
     if (stats.lastCompletedDate == null) {
       stats.currentStreak = 1;
+      stats.coins += 5; // First ever session bonus
     } else {
       final lastDate = DateTime(
         stats.lastCompletedDate!.year,
@@ -281,28 +298,64 @@ class LocalStorageService {
 
     stats.lastCompletedDate = today;
     stats.totalCompletedSessions += 1;
+    stats.coins += 2; // Fixed session reward
 
     await productivityBox.put('stats', stats);
 
     // Notification Milestones
     if (stats.currentStreak == 7) {
+      stats.coins += 10;
       await NotificationService().sendInstantNotification(
         id: 1007,
         title: '🔥 7-Day Streak!',
-        body: 'You\'re building momentum. Keep it up!',
+        body: 'You\'re building momentum. Keep it up! (+10 coins)',
       );
     } else if (stats.currentStreak == 30) {
+      stats.coins += 50;
       await NotificationService().sendInstantNotification(
         id: 1030,
         title: '🏆 30 Days Strong!',
-        body: 'You\'re becoming highly disciplined.',
+        body: 'You\'re becoming highly disciplined. (+50 coins)',
       );
     }
   }
 
   Future<void> buyStreakFreeze() async {
     final stats = getUserProductivity();
-    stats.streakFreezes += 1;
+    if (stats.coins >= 50) {
+      stats.coins -= 50;
+      stats.streakFreezes += 1;
+      await productivityBox.put('stats', stats);
+    }
+  }
+
+  Future<void> addCoins(int amount) async {
+    final stats = getUserProductivity();
+    stats.coins += amount;
     await productivityBox.put('stats', stats);
+  }
+
+  // Attendance Management
+  Future<void> markAttendance(
+    String eventId,
+    DateTime date,
+    bool attended,
+  ) async {
+    final key = '${eventId}_${date.year}${date.month}${date.day}';
+    await attendanceBox.put(
+      key,
+      AttendanceRecord(eventId: eventId, date: date, attended: attended),
+    );
+  }
+
+  List<AttendanceRecord> getAttendanceForEvent(String eventId) {
+    return attendanceBox.values.where((r) => r.eventId == eventId).toList();
+  }
+
+  double getAttendancePercentage(String eventId) {
+    final records = getAttendanceForEvent(eventId);
+    if (records.isEmpty) return 100.0;
+    final attendedCount = records.where((r) => r.attended).length;
+    return (attendedCount / records.length) * 100;
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import 'theme/app_theme.dart';
 import 'widgets/event_card.dart';
 import 'services/local_storage_service.dart';
 import 'services/notification_service.dart';
+import 'services/location_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'models/class_event.dart';
 import 'screens/import_screen.dart';
@@ -16,6 +18,10 @@ import 'screens/edit_event_screen.dart';
 import 'screens/program_setup_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/timetable_explorer_screen.dart';
+import 'screens/grade_calculator_screen.dart';
+import 'screens/absence_tracker_screen.dart';
+import 'screens/study_planner_screen.dart';
+import 'screens/performance_stats_screen.dart';
 import 'models/user_productivity.dart';
 
 void main() async {
@@ -68,6 +74,14 @@ class _ClassTimerProState extends State<ClassTimerPro> {
   void initState() {
     super.initState();
     _themeNotifier = ValueNotifier(widget.initialThemeMode);
+
+    // Start periodic GPS check for Late Trigger
+    Timer.periodic(const Duration(minutes: 10), (timer) {
+      LocationService().checkProximityToCampus();
+    });
+
+    // Immediate check on start
+    LocationService().checkProximityToCampus();
   }
 
   @override
@@ -132,6 +146,26 @@ class _ClassTimerProState extends State<ClassTimerPro> {
               case '/timetable-explorer':
                 return RouteTransitions.slideRight(
                   page: const TimetableExplorerScreen(),
+                  settings: settings,
+                );
+              case '/grade-calculator':
+                return RouteTransitions.slideRight(
+                  page: const GradeCalculatorScreen(),
+                  settings: settings,
+                );
+              case '/study-planner':
+                return RouteTransitions.slideRight(
+                  page: const StudyPlannerScreen(),
+                  settings: settings,
+                );
+              case '/performance-stats':
+                return RouteTransitions.slideRight(
+                  page: const PerformanceStatsScreen(),
+                  settings: settings,
+                );
+              case '/absence-tracker':
+                return RouteTransitions.slideRight(
+                  page: const AbsenceTrackerScreen(),
                   settings: settings,
                 );
               case '/edit-event':
@@ -204,6 +238,157 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
         ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    Theme.of(context).primaryColor.withOpacity(0.8),
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Class Timer Pro',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Level: Scholar',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.stars, color: Colors.amber, size: 20),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${LocalStorageService().getUserProductivity().coins} Coins',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.fireplace,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${LocalStorageService().getUserProductivity().currentStreak}d Streak',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home_outlined),
+              title: const Text('Dashboard'),
+              onTap: () => Navigator.pop(context),
+            ),
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 8, bottom: 4),
+              child: Text(
+                'ACADEMIC TOOLS',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.calculate_outlined),
+              title: const Text('Grade Predictor'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/grade-calculator');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_stories_outlined),
+              title: const Text('Study Planner'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/study-planner');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_busy_outlined),
+              title: const Text('Absence Tracker'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/absence-tracker');
+              },
+            ),
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 8, bottom: 4),
+              child: Text(
+                'ANALYTICS & INTELLIGENCE',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart_outlined),
+              title: const Text('Performance Stats'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/performance-stats');
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.crisis_alert_outlined,
+                color: LocalStorageService().isCrisisMode() ? Colors.red : null,
+              ),
+              title: const Text('Crisis Mode (Exam Week)'),
+              trailing: Switch(
+                value: LocalStorageService().isCrisisMode(),
+                activeColor: Colors.red,
+                onChanged: (v) async {
+                  await LocalStorageService().setCrisisMode(v);
+                  setState(() {});
+                },
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: const Text('Settings'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1003,5 +1188,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       return now.isAfter(eventEndTime);
     }).toList();
+  }
+}
+
+class PlaceholderPage extends StatelessWidget {
+  final String title;
+  const PlaceholderPage({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              '$title coming soon...',
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -4,6 +4,7 @@ import '../models/class_event.dart';
 import '../models/study_session.dart';
 import '../services/local_storage_service.dart';
 import '../services/focus_mode_service.dart';
+import '../services/focus_sound_service.dart';
 
 class FocusModeScreen extends StatefulWidget {
   final ClassEvent event;
@@ -21,6 +22,9 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
   bool _isRunning = false;
   late DateTime _sessionStartTime;
   final LocalStorageService _storageService = LocalStorageService();
+  final FocusSoundService _soundService = FocusSoundService();
+  bool _isBurnoutDetected = false;
+  int _sessionSecondsStarted = 0;
 
   @override
   void initState() {
@@ -62,6 +66,13 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
       if (_secondsRemaining > 0) {
         setState(() {
           _secondsRemaining--;
+          _sessionSecondsStarted++;
+
+          // Burnout Detector: 2+ hours in one session is "heavy"
+          // (User requested 5h, but let's nudge early at 2h)
+          if (_sessionSecondsStarted == 7200 && !_isBurnoutDetected) {
+            _isBurnoutDetected = true;
+          }
         });
       } else {
         _timer.cancel();
@@ -101,6 +112,11 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
     await _storageService.addStudySession(session);
     if (completed) {
       await _storageService.updateStreak();
+      await _storageService.markAttendance(
+        widget.event.id,
+        DateTime.now(),
+        true,
+      );
     }
   }
 
@@ -196,6 +212,7 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
   @override
   void dispose() {
     _timer.cancel();
+    _soundService.stop();
     super.dispose();
   }
 
@@ -258,6 +275,11 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
 
               const Spacer(),
 
+              if (_isBurnoutDetected) _buildBurnoutWarning(),
+              _buildSoundEngine(),
+
+              const Spacer(),
+
               // Bottom: Controls
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -280,6 +302,82 @@ class _FocusModeScreenState extends State<FocusModeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBurnoutWarning() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              "You've been pushing hard. Schedule recovery?",
+              style: TextStyle(color: Colors.orange, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.orange, size: 16),
+            onPressed: () => setState(() => _isBurnoutDetected = false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSoundEngine() {
+    return Column(
+      children: [
+        const Text(
+          'FOCUS AMBIENCE',
+          style: TextStyle(
+            color: Colors.white38,
+            fontSize: 10,
+            letterSpacing: 2,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _soundService.sounds.keys.map((name) {
+              final isSelected = _soundService.currentSound == name;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ChoiceChip(
+                  label: Text(name),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      _soundService.playSound(name);
+                    });
+                  },
+                  backgroundColor: Colors.white10,
+                  selectedColor: Theme.of(context).primaryColor,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white60,
+                    fontSize: 11,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 

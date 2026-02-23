@@ -50,6 +50,8 @@ dependencies:
   awesome_notifications: ^0.10.1
   timezone: ^0.9.4
   device_calendar: ^4.3.2
+  just_audio: ^0.9.42
+  geolocator: ^13.0.0
 
 dev_dependencies:
   flutter_test:
