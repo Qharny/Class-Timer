@@ -21,13 +21,14 @@ class UserProductivityAdapter extends TypeAdapter<UserProductivity> {
       longestStreak: fields[1] as int,
       lastCompletedDate: fields[2] as DateTime?,
       totalCompletedSessions: fields[3] as int,
+      streakFreezes: fields[4] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserProductivity obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.currentStreak)
       ..writeByte(1)
@@ -35,7 +36,9 @@ class UserProductivityAdapter extends TypeAdapter<UserProductivity> {
       ..writeByte(2)
       ..write(obj.lastCompletedDate)
       ..writeByte(3)
-      ..write(obj.totalCompletedSessions);
+      ..write(obj.totalCompletedSessions)
+      ..writeByte(4)
+      ..write(obj.streakFreezes);
   }
 
   @override

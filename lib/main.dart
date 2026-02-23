@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
 import 'widgets/event_card.dart';
 import 'services/local_storage_service.dart';
+import 'services/notification_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'models/class_event.dart';
 import 'screens/import_screen.dart';
@@ -26,6 +27,12 @@ void main() async {
   // Initialize Local Storage
   final storageService = LocalStorageService();
   await storageService.init();
+
+  // Initialize Notifications
+  final notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.requestPermissions();
+  await notificationService.rescheduleAll();
 
   final bool onboardingComplete = storageService.isOnboardingComplete();
   final program = storageService.getProgram();
@@ -229,6 +236,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildSectionTitle('📊 PRODUCTIVITY ANALYTICS'),
             const SizedBox(height: 12),
             _buildAnalyticsCard(_getStats()),
+            const SizedBox(height: 16),
+            _buildFreezeCard(_getStats()),
             const SizedBox(height: 32),
 
             // Middle Section: Up Next
@@ -521,6 +530,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     color: Colors.orange,
                   ),
                 ),
+                if (stats.streakFreezes > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.ac_unit, size: 12, color: Colors.blue),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${stats.streakFreezes}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -648,6 +684,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFreezeCard(UserProductivity stats) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.ac_unit, color: Colors.blue),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Streak Freeze',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Protects your streak if you miss a day.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _handleBuyFreeze(),
+            child: const Text('Get Free'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleBuyFreeze() async {
+    await _storageService.buyStreakFreeze();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❄️ Streak Freeze acquired!'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+      setState(() {});
+    }
   }
 
   Widget _buildAnalyticItem(

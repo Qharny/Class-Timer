@@ -7,6 +7,7 @@ import '../models/study_session.dart';
 import '../models/course.dart';
 import '../models/program.dart';
 import '../models/user_productivity.dart';
+import 'notification_service.dart';
 
 class LocalStorageService {
   static final LocalStorageService _instance = LocalStorageService._internal();
@@ -107,12 +108,17 @@ class LocalStorageService {
     await settingsBox.put('theme_mode', modeString);
   }
 
-  bool getNotificationsEnabled() {
-    return settingsBox.get('notifications_enabled', defaultValue: true);
+  bool getNotificationsEnabled() =>
+      settingsBox.get('notifications_enabled', defaultValue: true);
+  Future<void> setNotificationsEnabled(bool value) async =>
+      await settingsBox.put('notifications_enabled', value);
+
+  bool getReminderEnabled(String key, {bool defaultValue = true}) {
+    return settingsBox.get(key, defaultValue: defaultValue);
   }
 
-  Future<void> setNotificationsEnabled(bool enabled) async {
-    await settingsBox.put('notifications_enabled', enabled);
+  Future<void> setReminderEnabled(String key, bool value) async {
+    await settingsBox.put(key, value);
   }
 
   String getUserName() {
@@ -207,9 +213,11 @@ class LocalStorageService {
   // Helper methods
   Future<void> addClassEvent(ClassEvent event) async {
     await classBox.put(event.id, event);
+    await NotificationService().scheduleClassReminders(event);
   }
 
   Future<void> deleteClassEvent(String id) async {
+    await NotificationService().cancelNotificationsForEvent(id);
     await classBox.delete(id);
   }
 
@@ -249,7 +257,14 @@ class LocalStorageService {
       if (difference == 1) {
         stats.currentStreak += 1;
       } else if (difference > 1) {
-        stats.currentStreak = 1;
+        // missed day - check for freeze
+        if (stats.streakFreezes > 0) {
+          stats.streakFreezes -= 1;
+          stats.currentStreak += 1;
+          // Note: In a real app, you might want to log this or notify the user
+        } else {
+          stats.currentStreak = 1;
+        }
       }
       // If difference == 0 (same day), do nothing to streak
     }
@@ -261,6 +276,27 @@ class LocalStorageService {
     stats.lastCompletedDate = today;
     stats.totalCompletedSessions += 1;
 
+    await productivityBox.put('stats', stats);
+
+    // Notification Milestones
+    if (stats.currentStreak == 7) {
+      await NotificationService().sendInstantNotification(
+        id: 1007,
+        title: '🔥 7-Day Streak!',
+        body: 'You\'re building momentum. Keep it up!',
+      );
+    } else if (stats.currentStreak == 30) {
+      await NotificationService().sendInstantNotification(
+        id: 1030,
+        title: '🏆 30 Days Strong!',
+        body: 'You\'re becoming highly disciplined.',
+      );
+    }
+  }
+
+  Future<void> buyStreakFreeze() async {
+    final stats = getUserProductivity();
+    stats.streakFreezes += 1;
     await productivityBox.put('stats', stats);
   }
 }

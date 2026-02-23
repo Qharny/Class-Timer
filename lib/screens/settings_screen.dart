@@ -21,11 +21,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _notificationsEnabled;
   late ThemeMode _themeMode;
 
-  // New settings state
+  late String _syncProvider;
   late int _reminderMinutes;
   late bool _contextMessagesEnabled;
   late bool _autoFocusEnabled;
-  late String _syncProvider;
+
+  // Granular notification settings
+  late bool _reminder15Min;
+  late bool _reminder5Min;
+  late bool _reminderWrapUp;
+  late bool _streakReminder;
+  late bool _dailyMotivation;
 
   @override
   void initState() {
@@ -39,6 +45,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _contextMessagesEnabled = _storageService.getContextMessagesEnabled();
     _autoFocusEnabled = _storageService.getAutoFocusEnabled();
     _syncProvider = _storageService.getSyncProvider();
+
+    _reminder15Min = _storageService.getReminderEnabled('reminder_15_min');
+    _reminder5Min = _storageService.getReminderEnabled('reminder_5_min');
+    _reminderWrapUp = _storageService.getReminderEnabled('reminder_wrap_up');
+    _streakReminder = _storageService.getReminderEnabled('streak_reminder');
+    _dailyMotivation = _storageService.getReminderEnabled('daily_motivation');
   }
 
   @override
@@ -135,6 +147,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _notificationsEnabled,
             onChanged: _toggleNotifications,
           ),
+          if (_notificationsEnabled) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('15-Minute Reminder'),
+                    subtitle: const Text('Alert before class starts'),
+                    value: _reminder15Min,
+                    onChanged: (v) async {
+                      setState(() => _reminder15Min = v);
+                      await _storageService.setReminderEnabled(
+                        'reminder_15_min',
+                        v,
+                      );
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('5-Minute Reminder'),
+                    subtitle: const Text('Final move alert'),
+                    value: _reminder5Min,
+                    onChanged: (v) async {
+                      setState(() => _reminder5Min = v);
+                      await _storageService.setReminderEnabled(
+                        'reminder_5_min',
+                        v,
+                      );
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Wrap-Up Reminder'),
+                    subtitle: const Text('Alert when class is ending'),
+                    value: _reminderWrapUp,
+                    onChanged: (v) async {
+                      setState(() => _reminderWrapUp = v);
+                      await _storageService.setReminderEnabled(
+                        'reminder_wrap_up',
+                        v,
+                      );
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Daily Streak Warning'),
+                    subtitle: const Text('Alert if streak is at risk'),
+                    value: _streakReminder,
+                    onChanged: (v) async {
+                      setState(() => _streakReminder = v);
+                      await _storageService.setReminderEnabled(
+                        'streak_reminder',
+                        v,
+                      );
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Morning Motivation'),
+                    subtitle: const Text('Start your day with discipline'),
+                    value: _dailyMotivation,
+                    onChanged: (v) async {
+                      setState(() => _dailyMotivation = v);
+                      await _storageService.setReminderEnabled(
+                        'daily_motivation',
+                        v,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
           const Divider(),
           _buildSectionHeader(context, 'Smart Buffer'),
           ListTile(

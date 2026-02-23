@@ -16,10 +16,14 @@ class UserProductivity extends HiveObject {
   @HiveField(3)
   int totalCompletedSessions;
 
+  @HiveField(4)
+  int streakFreezes;
+
   UserProductivity({
     this.currentStreak = 0,
     this.longestStreak = 0,
     this.lastCompletedDate,
     this.totalCompletedSessions = 0,
+    this.streakFreezes = 0,
   });
 }
