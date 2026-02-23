@@ -17,12 +17,12 @@ class UserProductivityAdapter extends TypeAdapter<UserProductivity> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return UserProductivity(
-      currentStreak: fields[0] as int,
-      longestStreak: fields[1] as int,
+      currentStreak: (fields[0] as int?) ?? 0,
+      longestStreak: (fields[1] as int?) ?? 0,
       lastCompletedDate: fields[2] as DateTime?,
-      totalCompletedSessions: fields[3] as int,
-      streakFreezes: fields[4] as int,
-      coins: fields[5] as int,
+      totalCompletedSessions: (fields[3] as int?) ?? 0,
+      streakFreezes: (fields[4] as int?) ?? 0,
+      coins: (fields[5] as int?) ?? 0,
     );
   }
 

@@ -29,7 +29,7 @@ class LocalStorageService {
   late SharedPreferences _prefs;
 
   Future<void> init() async {
-    await Hive.initFlutter();
+    // NOTE: Hive.initFlutter() is already called in main() — do NOT call it again here
     _prefs = await SharedPreferences.getInstance();
 
     // Register Adapters
@@ -52,13 +52,17 @@ class LocalStorageService {
       Hive.registerAdapter(AttendanceRecordAdapter());
     }
 
-    // Open Boxes
+    // Open Boxes — with migration safety for schema changes
     await Hive.openBox<ClassEvent>(classBoxName);
     await Hive.openBox<StudySession>(studyBoxName);
     await Hive.openBox(settingsBoxName);
     await Hive.openBox<Course>(courseBoxName);
     await Hive.openBox<Program>(programBoxName);
+
+    // Productivity box — adapter is now null-safe for schema migrations
     await Hive.openBox<UserProductivity>(productivityBoxName);
+
+    // Attendance box: new in v2
     await Hive.openBox<AttendanceRecord>(attendanceBoxName);
   }
 

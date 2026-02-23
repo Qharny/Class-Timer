@@ -53,8 +53,6 @@ class _ImportScreenState extends State<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Timetable'),
@@ -394,7 +392,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
                   if (conflicts.isNotEmpty && mounted) {
                     setState(() => _isLoading = false);
-                    final resolved = await Navigator.push<ClassEvent>(
+                    await Navigator.push<ClassEvent>(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ConflictResolutionScreen(

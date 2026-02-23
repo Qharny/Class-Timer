@@ -37,8 +37,10 @@ void main() async {
   // Initialize Notifications
   final notificationService = NotificationService();
   await notificationService.init();
-  await notificationService.requestPermissions();
-  await notificationService.rescheduleAll();
+
+  // Don't await permission request or rescheduling in main to avoid blocking startup
+  unawaited(notificationService.requestPermissions());
+  unawaited(notificationService.rescheduleAll());
 
   final bool onboardingComplete = storageService.isOnboardingComplete();
   final program = storageService.getProgram();
@@ -77,11 +79,11 @@ class _ClassTimerProState extends State<ClassTimerPro> {
 
     // Start periodic GPS check for Late Trigger
     Timer.periodic(const Duration(minutes: 10), (timer) {
-      LocationService().checkProximityToCampus();
+      unawaited(LocationService().checkProximityToCampus());
     });
 
-    // Immediate check on start
-    LocationService().checkProximityToCampus();
+    // Immediate check on start (non-blocking)
+    unawaited(LocationService().checkProximityToCampus());
   }
 
   @override
@@ -229,6 +231,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+            tooltip: 'Menu',
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -872,7 +881,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildFreezeCard(UserProductivity stats) {
-    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

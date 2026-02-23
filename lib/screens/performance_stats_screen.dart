@@ -60,7 +60,7 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
-      childAspectRatio: 1.2,
+      childAspectRatio: 1.0,
       children: [
         _buildStatCard(
           'Study Hours',
@@ -97,7 +97,7 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(24),
@@ -107,20 +107,20 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 12),
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
           Text(
             value,
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: color.withOpacity(0.7)),
+            style: TextStyle(fontSize: 11, color: color.withOpacity(0.7)),
           ),
         ],
       ),
