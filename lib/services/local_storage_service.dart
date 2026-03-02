@@ -29,10 +29,25 @@ class LocalStorageService {
   late SharedPreferences _prefs;
 
   Future<void> init() async {
-    // NOTE: Hive.initFlutter() is already called in main() — do NOT call it again here
-    _prefs = await SharedPreferences.getInstance();
+    try {
+      // NOTE: Hive.initFlutter() is already called in main() — do NOT call it again here
+      _prefs = await SharedPreferences.getInstance();
 
-    // Register Adapters
+      // Register Adapters
+      _registerAdapters();
+
+      // Open Boxes — with migration safety for schema changes
+      await _openBoxes();
+    } catch (e) {
+      debugPrint('LocalStorageService init error: $e');
+      // In case of a major failure, we still want _prefs to be initialized if possible
+      try {
+        _prefs = await SharedPreferences.getInstance();
+      } catch (_) {}
+    }
+  }
+
+  void _registerAdapters() {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(ClassEventAdapter());
     }
@@ -51,19 +66,22 @@ class LocalStorageService {
     if (!Hive.isAdapterRegistered(8)) {
       Hive.registerAdapter(AttendanceRecordAdapter());
     }
+  }
 
-    // Open Boxes — with migration safety for schema changes
-    await Hive.openBox<ClassEvent>(classBoxName);
-    await Hive.openBox<StudySession>(studyBoxName);
-    await Hive.openBox(settingsBoxName);
-    await Hive.openBox<Course>(courseBoxName);
-    await Hive.openBox<Program>(programBoxName);
-
-    // Productivity box — adapter is now null-safe for schema migrations
-    await Hive.openBox<UserProductivity>(productivityBoxName);
-
-    // Attendance box: new in v2
-    await Hive.openBox<AttendanceRecord>(attendanceBoxName);
+  Future<void> _openBoxes() async {
+    try {
+      await Hive.openBox<ClassEvent>(classBoxName);
+      await Hive.openBox<StudySession>(studyBoxName);
+      await Hive.openBox(settingsBoxName);
+      await Hive.openBox<Course>(courseBoxName);
+      await Hive.openBox<Program>(programBoxName);
+      await Hive.openBox<UserProductivity>(productivityBoxName);
+      await Hive.openBox<AttendanceRecord>(attendanceBoxName);
+    } catch (e) {
+      debugPrint('Error opening Hive boxes: $e');
+      // If a box is corrupted, one might attempt to delete it and reopen,
+      // but for now, we just catch the error to prevent app crash on startup.
+    }
   }
 
   Box<ClassEvent> get classBox => Hive.box<ClassEvent>(classBoxName);

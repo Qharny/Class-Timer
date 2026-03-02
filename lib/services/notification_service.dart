@@ -9,45 +9,50 @@ class NotificationService {
   NotificationService._internal();
 
   Future<void> init() async {
-    final storage = LocalStorageService();
-    final bool playSound = storage.getNotificationSoundEnabled();
-    final bool alarmMode = storage.getAlarmModeEnabled();
+    try {
+      final storage = LocalStorageService();
+      final bool playSound = storage.getNotificationSoundEnabled();
+      final bool alarmMode = storage.getAlarmModeEnabled();
 
-    await AwesomeNotifications().initialize('resource://mipmap/launcher_icon', [
-      NotificationChannel(
-        channelKey: 'class_reminders',
-        channelName: 'Class Reminders',
-        channelDescription: 'Notifications for class start times',
-        defaultColor: const Color(0xFF9D50BB),
-        ledColor: Colors.white,
-        importance: alarmMode
-            ? NotificationImportance.Max
-            : NotificationImportance.High,
-        channelShowBadge: true,
-        onlyAlertOnce: true,
-        playSound: playSound,
-        criticalAlerts: true,
-      ),
-      NotificationChannel(
-        channelKey: 'streak_reminders',
-        channelName: 'Streak & Motivation',
-        channelDescription: 'Daily reminders to keep your streak alive',
-        defaultColor: const Color(0xFFFF5722),
-        ledColor: Colors.orange,
-        importance: NotificationImportance.High,
-        channelShowBadge: true,
-        playSound: playSound,
-      ),
-      NotificationChannel(
-        channelKey: 'engagement_nudges',
-        channelName: 'Engagement Nudges',
-        channelDescription: 'Gentle reminders to return to your studies',
-        defaultColor: const Color(0xFF4CAF50),
-        ledColor: Colors.green,
-        importance: NotificationImportance.Default,
-        playSound: playSound,
-      ),
-    ], debug: true);
+      await AwesomeNotifications()
+          .initialize('resource://mipmap/launcher_icon', [
+            NotificationChannel(
+              channelKey: 'class_reminders',
+              channelName: 'Class Reminders',
+              channelDescription: 'Notifications for class start times',
+              defaultColor: const Color(0xFF9D50BB),
+              ledColor: Colors.white,
+              importance: alarmMode
+                  ? NotificationImportance.Max
+                  : NotificationImportance.High,
+              channelShowBadge: true,
+              onlyAlertOnce: true,
+              playSound: playSound,
+              criticalAlerts: true,
+            ),
+            NotificationChannel(
+              channelKey: 'streak_reminders',
+              channelName: 'Streak & Motivation',
+              channelDescription: 'Daily reminders to keep your streak alive',
+              defaultColor: const Color(0xFFFF5722),
+              ledColor: Colors.orange,
+              importance: NotificationImportance.High,
+              channelShowBadge: true,
+              playSound: playSound,
+            ),
+            NotificationChannel(
+              channelKey: 'engagement_nudges',
+              channelName: 'Engagement Nudges',
+              channelDescription: 'Gentle reminders to return to your studies',
+              defaultColor: const Color(0xFF4CAF50),
+              ledColor: Colors.green,
+              importance: NotificationImportance.Default,
+              playSound: playSound,
+            ),
+          ], debug: true);
+    } catch (e) {
+      debugPrint('NotificationService init error: $e');
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -286,14 +291,18 @@ class NotificationService {
   }
 
   Future<void> rescheduleAll() async {
-    await AwesomeNotifications().cancelAllSchedules();
-    final events = LocalStorageService().getAllClassEvents();
-    for (final event in events) {
-      await scheduleClassReminders(event);
+    try {
+      await AwesomeNotifications().cancelAllSchedules();
+      final events = LocalStorageService().getAllClassEvents();
+      for (final event in events) {
+        await scheduleClassReminders(event);
+      }
+      await scheduleStreakReminder();
+      await scheduleDailyMotivation();
+      await scheduleEngagementNudge();
+    } catch (e) {
+      debugPrint('NotificationService rescheduleAll error: $e');
     }
-    await scheduleStreakReminder();
-    await scheduleDailyMotivation();
-    await scheduleEngagementNudge();
   }
 
   Future<void> sendInstantNotification({

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
@@ -27,33 +28,61 @@ import 'models/user_productivity.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive
-  await Hive.initFlutter();
+  // Global error handling for Flutter framework
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter error: ${details.exception}');
+  };
 
-  // Initialize Local Storage
-  final storageService = LocalStorageService();
-  await storageService.init();
+  // Global error handling for Dart asynchronous errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Global asynchronous error: $error');
+    return true;
+  };
 
-  // Initialize Notifications
-  final notificationService = NotificationService();
-  await notificationService.init();
+  try {
+    // Initialize Hive
+    await Hive.initFlutter();
 
-  // Don't await permission request or rescheduling in main to avoid blocking startup
-  unawaited(notificationService.requestPermissions());
-  unawaited(notificationService.rescheduleAll());
+    // Initialize Local Storage
+    final storageService = LocalStorageService();
+    await storageService.init();
 
-  final bool onboardingComplete = storageService.isOnboardingComplete();
-  final program = storageService.getProgram();
-  final themeMode = storageService.getThemeMode();
+    // Initialize Notifications
+    final notificationService = NotificationService();
+    await notificationService.init();
 
-  String initialRoute = '/';
-  if (onboardingComplete) {
-    initialRoute = (program == null) ? '/program-setup' : '/dashboard';
+    // Don't await permission request or rescheduling in main to avoid blocking startup
+    unawaited(notificationService.requestPermissions());
+    unawaited(notificationService.rescheduleAll());
+
+    final bool onboardingComplete = storageService.isOnboardingComplete();
+    final program = storageService.getProgram();
+    final themeMode = storageService.getThemeMode();
+
+    String initialRoute = '/';
+    if (onboardingComplete) {
+      initialRoute = (program == null) ? '/program-setup' : '/dashboard';
+    }
+
+    runApp(
+      ClassTimerPro(initialRoute: initialRoute, initialThemeMode: themeMode),
+    );
+  } catch (e) {
+    debugPrint('Critical startup error: $e');
+    // Even if startup fails partially, try to run the app to show an error screen or at least avoid a complete crash
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text(
+              'App failed to start correctly. Please try restarting.',
+            ),
+          ),
+        ),
+      ),
+    );
   }
-
-  runApp(
-    ClassTimerPro(initialRoute: initialRoute, initialThemeMode: themeMode),
-  );
 }
 
 class ClassTimerPro extends StatefulWidget {
