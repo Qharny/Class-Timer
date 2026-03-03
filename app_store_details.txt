@@ -21,6 +21,7 @@ Key Features:
 
 Stop worrying about missing classes and start focusing on your academic success. Download Class Timer Pro today and take control of your student journey!
 
-Permission Usage (READ_MEDIA_IMAGES):
+Permission Usage & Data Disclosure:
 ------------------------------------
-We use this permission to allow you to upload images of your class timetable. Our app then uses smart text recognition (OCR) to automatically extract your schedule, saving you the time of manual entry. (203 chars)
+- Photos and Media (READ_MEDIA_IMAGES): We allow you to upload images of your class timetable solely for the purpose of automatic schedule extraction. Our app use on-device text recognition (OCR) to convert your images into events. We do not store or transmit your photos to any external servers.
+- Location (ACCESS_FINE_LOCATION): We use your background location to provide "Smart Buffer Alerts." This allows the app to notify you if you are still far from your campus venue when a class is about to start. Your location data is processed only on-device and is never shared. (558 chars)

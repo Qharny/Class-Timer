@@ -17,3 +17,15 @@
 # Play Core & Deferred Components
 -dontwarn com.google.android.play.core.**
 -dontwarn io.flutter.embedding.engine.deferredcomponents.**
+
+# Awesome Notifications
+-keep class me.carda.awesome_notifications.** { *; }
+-dontwarn me.carda.awesome_notifications.**
+
+# Hive
+-keep class com.hivedb.** { *; }
+-keep class com.google.common.hash.** { *; }
+-keepnames class * extends io.hive.TypeAdapter
+-keep class * extends io.hive.TypeAdapter { *; }
+-keep interface io.hive.TypeAdapter { *; }
+-dontwarn com.google.common.hash.**

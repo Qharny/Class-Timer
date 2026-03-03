@@ -26,7 +26,7 @@ class LocalStorageService {
   static const String _onboardingKey = 'onboarding_complete';
   static const String _firstTimeKey = 'is_first_time';
 
-  late SharedPreferences _prefs;
+  SharedPreferences? _prefs;
 
   Future<void> init() async {
     try {
@@ -42,7 +42,7 @@ class LocalStorageService {
       debugPrint('LocalStorageService init error: $e');
       // In case of a major failure, we still want _prefs to be initialized if possible
       try {
-        _prefs = await SharedPreferences.getInstance();
+        _prefs ??= await SharedPreferences.getInstance();
       } catch (_) {}
     }
   }
@@ -69,51 +69,69 @@ class LocalStorageService {
   }
 
   Future<void> _openBoxes() async {
+    await _safeOpenBox<ClassEvent>(classBoxName);
+    await _safeOpenBox<StudySession>(studyBoxName);
+    await _safeOpenBox(settingsBoxName);
+    await _safeOpenBox<Course>(courseBoxName);
+    await _safeOpenBox<Program>(programBoxName);
+    await _safeOpenBox<UserProductivity>(productivityBoxName);
+    await _safeOpenBox<AttendanceRecord>(attendanceBoxName);
+  }
+
+  Future<void> _safeOpenBox<T>(String name) async {
     try {
-      await Hive.openBox<ClassEvent>(classBoxName);
-      await Hive.openBox<StudySession>(studyBoxName);
-      await Hive.openBox(settingsBoxName);
-      await Hive.openBox<Course>(courseBoxName);
-      await Hive.openBox<Program>(programBoxName);
-      await Hive.openBox<UserProductivity>(productivityBoxName);
-      await Hive.openBox<AttendanceRecord>(attendanceBoxName);
+      await Hive.openBox<T>(name);
     } catch (e) {
-      debugPrint('Error opening Hive boxes: $e');
-      // If a box is corrupted, one might attempt to delete it and reopen,
-      // but for now, we just catch the error to prevent app crash on startup.
+      debugPrint('Error opening Hive box $name: $e. Attempting to recover...');
+      try {
+        // If box is corrupted, delete and recreate
+        await Hive.deleteBoxFromDisk(name);
+        await Hive.openBox<T>(name);
+      } catch (recoveryError) {
+        debugPrint('Failed to recover Hive box $name: $recoveryError');
+      }
     }
   }
 
-  Box<ClassEvent> get classBox => Hive.box<ClassEvent>(classBoxName);
-  Box<StudySession> get studyBox => Hive.box<StudySession>(studyBoxName);
-  Box get settingsBox => Hive.box(settingsBoxName);
-  Box<Course> get courseBox => Hive.box<Course>(courseBoxName);
-  Box<Program> get programBox => Hive.box<Program>(programBoxName);
-  Box<UserProductivity> get productivityBox =>
-      Hive.box<UserProductivity>(productivityBoxName);
-  Box<AttendanceRecord> get attendanceBox =>
-      Hive.box<AttendanceRecord>(attendanceBoxName);
+  Box<ClassEvent>? get classBox =>
+      Hive.isBoxOpen(classBoxName) ? Hive.box<ClassEvent>(classBoxName) : null;
+  Box<StudySession>? get studyBox => Hive.isBoxOpen(studyBoxName)
+      ? Hive.box<StudySession>(studyBoxName)
+      : null;
+  Box? get settingsBox =>
+      Hive.isBoxOpen(settingsBoxName) ? Hive.box(settingsBoxName) : null;
+  Box<Course>? get courseBox =>
+      Hive.isBoxOpen(courseBoxName) ? Hive.box<Course>(courseBoxName) : null;
+  Box<Program>? get programBox =>
+      Hive.isBoxOpen(programBoxName) ? Hive.box<Program>(programBoxName) : null;
+  Box<UserProductivity>? get productivityBox =>
+      Hive.isBoxOpen(productivityBoxName)
+      ? Hive.box<UserProductivity>(productivityBoxName)
+      : null;
+  Box<AttendanceRecord>? get attendanceBox => Hive.isBoxOpen(attendanceBoxName)
+      ? Hive.box<AttendanceRecord>(attendanceBoxName)
+      : null;
 
   bool isOnboardingComplete() {
-    return _prefs.getBool(_onboardingKey) ?? false;
+    return _prefs?.getBool(_onboardingKey) ?? false;
   }
 
   Future<void> setOnboardingComplete(bool complete) async {
-    await _prefs.setBool(_onboardingKey, complete);
+    await _prefs?.setBool(_onboardingKey, complete);
   }
 
   bool isFirstTime() {
-    final bool? isFirstTime = _prefs.getBool(_firstTimeKey);
+    final bool? isFirstTime = _prefs?.getBool(_firstTimeKey);
     if (isFirstTime == null) {
       // First time running the app, set to false for future checks
-      _prefs.setBool(_firstTimeKey, false);
+      _prefs?.setBool(_firstTimeKey, false);
       return true;
     }
     return false;
   }
 
   ThemeMode getThemeMode() {
-    final mode = settingsBox.get('theme_mode', defaultValue: 'system');
+    final mode = settingsBox?.get('theme_mode', defaultValue: 'system');
     switch (mode) {
       case 'light':
         return ThemeMode.light;
@@ -136,166 +154,171 @@ class LocalStorageService {
       default:
         modeString = 'system';
     }
-    await settingsBox.put('theme_mode', modeString);
+    await settingsBox?.put('theme_mode', modeString);
   }
 
   bool getNotificationsEnabled() =>
-      settingsBox.get('notifications_enabled', defaultValue: true);
+      settingsBox?.get('notifications_enabled', defaultValue: true) ?? true;
   Future<void> setNotificationsEnabled(bool value) async =>
-      await settingsBox.put('notifications_enabled', value);
+      await settingsBox?.put('notifications_enabled', value);
 
   bool getReminderEnabled(String key, {bool defaultValue = true}) {
-    return settingsBox.get(key, defaultValue: defaultValue);
+    return settingsBox?.get(key, defaultValue: defaultValue) ?? defaultValue;
   }
 
   Future<void> setReminderEnabled(String key, bool value) async {
-    await settingsBox.put(key, value);
+    await settingsBox?.put(key, value);
   }
 
   String getUserName() {
-    return settingsBox.get('user_name', defaultValue: 'Scholar');
+    return settingsBox?.get('user_name', defaultValue: 'Scholar') ?? 'Scholar';
   }
 
   Future<void> setUserName(String name) async {
-    await settingsBox.put('user_name', name);
+    await settingsBox?.put('user_name', name);
   }
 
   Future<void> clearAllData() async {
-    await classBox.clear();
-    await studyBox.clear();
-    await settingsBox.clear();
+    await classBox?.clear();
+    await studyBox?.clear();
+    await settingsBox?.clear();
     await setOnboardingComplete(false); // Reset onboarding on full clear
   }
 
   // New settings for Smart Buffer & Sync
   int getReminderMinutes() {
-    return settingsBox.get('reminder_minutes', defaultValue: 15);
+    return settingsBox?.get('reminder_minutes', defaultValue: 15) ?? 15;
   }
 
   Future<void> setReminderMinutes(int minutes) async {
-    await settingsBox.put('reminder_minutes', minutes);
+    await settingsBox?.put('reminder_minutes', minutes);
   }
 
   bool getContextMessagesEnabled() {
-    return settingsBox.get('context_messages_enabled', defaultValue: true);
+    return settingsBox?.get('context_messages_enabled', defaultValue: true) ??
+        true;
   }
 
   Future<void> setContextMessagesEnabled(bool enabled) async {
-    await settingsBox.put('context_messages_enabled', enabled);
+    await settingsBox?.put('context_messages_enabled', enabled);
   }
 
   bool isCrisisMode() {
-    return settingsBox.get('crisis_mode', defaultValue: false);
+    return settingsBox?.get('crisis_mode', defaultValue: false) ?? false;
   }
 
   Future<void> setCrisisMode(bool enabled) async {
-    await settingsBox.put('crisis_mode', enabled);
+    await settingsBox?.put('crisis_mode', enabled);
   }
 
   bool getAutoFocusEnabled() {
-    return settingsBox.get('auto_focus_enabled', defaultValue: false);
+    return settingsBox?.get('auto_focus_enabled', defaultValue: false) ?? false;
   }
 
   Future<void> setAutoFocusEnabled(bool enabled) async {
-    await settingsBox.put('auto_focus_enabled', enabled);
+    await settingsBox?.put('auto_focus_enabled', enabled);
   }
 
   bool getNotificationSoundEnabled() {
-    return settingsBox.get('notification_sound', defaultValue: true);
+    return settingsBox?.get('notification_sound', defaultValue: true) ?? true;
   }
 
   Future<void> setNotificationSoundEnabled(bool enabled) async {
-    await settingsBox.put('notification_sound', enabled);
+    await settingsBox?.put('notification_sound', enabled);
   }
 
   bool getAlarmModeEnabled() {
-    return settingsBox.get('alarm_mode', defaultValue: false);
+    return settingsBox?.get('alarm_mode', defaultValue: false) ?? false;
   }
 
   Future<void> setAlarmModeEnabled(bool enabled) async {
-    await settingsBox.put('alarm_mode', enabled);
+    await settingsBox?.put('alarm_mode', enabled);
   }
 
   String getSyncProvider() {
-    return settingsBox.get('sync_provider', defaultValue: 'off');
+    return settingsBox?.get('sync_provider', defaultValue: 'off') ?? 'off';
   }
 
   Future<void> setSyncProvider(String provider) async {
-    await settingsBox.put('sync_provider', provider);
+    await settingsBox?.put('sync_provider', provider);
   }
 
   String? getLastSyncTime() {
-    return settingsBox.get('last_sync_time');
+    return settingsBox?.get('last_sync_time');
   }
 
   Future<void> setLastSyncTime(String time) async {
-    await settingsBox.put('last_sync_time', time);
+    await settingsBox?.put('last_sync_time', time);
   }
 
   String getConnectedAccount() {
-    return settingsBox.get('connected_account', defaultValue: 'Not connected');
+    return settingsBox?.get(
+          'connected_account',
+          defaultValue: 'Not connected',
+        ) ??
+        'Not connected';
   }
 
   Future<void> setConnectedAccount(String account) async {
-    await settingsBox.put('connected_account', account);
+    await settingsBox?.put('connected_account', account);
   }
 
   // Academic Hierarchy CRUD
   Program? getProgram() {
-    return programBox.get('current_program');
+    return programBox?.get('current_program');
   }
 
   Future<void> setProgram(Program program) async {
-    await programBox.put('current_program', program);
+    await programBox?.put('current_program', program);
   }
 
   List<Course> getAllCourses() {
-    return courseBox.values.toList();
+    return courseBox?.values.toList() ?? [];
   }
 
   Course? getCourse(String id) {
-    return courseBox.get(id);
+    return courseBox?.get(id);
   }
 
   Future<void> addCourse(Course course) async {
-    await courseBox.put(course.id, course);
+    await courseBox?.put(course.id, course);
   }
 
   Future<void> deleteCourse(String id) async {
-    await courseBox.delete(id);
+    await courseBox?.delete(id);
   }
 
   // Helper methods
   Future<void> addClassEvent(ClassEvent event) async {
-    await classBox.put(event.id, event);
+    await classBox?.put(event.id, event);
     await NotificationService().scheduleClassReminders(event);
     await CalendarSyncService().syncEvent(event);
   }
 
   Future<void> deleteClassEvent(String id) async {
-    final event = classBox.get(id);
+    final event = classBox?.get(id);
     if (event?.calendarEventId != null) {
       await CalendarSyncService().deleteEvent(event!.calendarEventId!);
     }
     await NotificationService().cancelNotificationsForEvent(id);
-    await classBox.delete(id);
+    await classBox?.delete(id);
   }
 
   Future<void> addStudySession(StudySession session) async {
-    await studyBox.put(session.id, session);
+    await studyBox?.put(session.id, session);
   }
 
   List<ClassEvent> getAllClassEvents() {
-    return classBox.values.toList();
+    return classBox?.values.toList() ?? [];
   }
 
   List<StudySession> getAllStudySessions() {
-    return studyBox.values.toList();
+    return studyBox?.values.toList() ?? [];
   }
 
   // Productivity & Streak Logic
   UserProductivity getUserProductivity() {
-    return productivityBox.get('stats', defaultValue: UserProductivity()) ??
+    return productivityBox?.get('stats', defaultValue: UserProductivity()) ??
         UserProductivity();
   }
 
@@ -338,7 +361,7 @@ class LocalStorageService {
     stats.totalCompletedSessions += 1;
     stats.coins += 2; // Fixed session reward
 
-    await productivityBox.put('stats', stats);
+    await productivityBox?.put('stats', stats);
 
     // Notification Milestones
     if (stats.currentStreak == 7) {
@@ -363,14 +386,14 @@ class LocalStorageService {
     if (stats.coins >= 50) {
       stats.coins -= 50;
       stats.streakFreezes += 1;
-      await productivityBox.put('stats', stats);
+      await productivityBox?.put('stats', stats);
     }
   }
 
   Future<void> addCoins(int amount) async {
     final stats = getUserProductivity();
     stats.coins += amount;
-    await productivityBox.put('stats', stats);
+    await productivityBox?.put('stats', stats);
   }
 
   // Attendance Management
@@ -380,14 +403,15 @@ class LocalStorageService {
     bool attended,
   ) async {
     final key = '${eventId}_${date.year}${date.month}${date.day}';
-    await attendanceBox.put(
+    await attendanceBox?.put(
       key,
       AttendanceRecord(eventId: eventId, date: date, attended: attended),
     );
   }
 
   List<AttendanceRecord> getAttendanceForEvent(String eventId) {
-    return attendanceBox.values.where((r) => r.eventId == eventId).toList();
+    return attendanceBox?.values.where((r) => r.eventId == eventId).toList() ??
+        [];
   }
 
   double getAttendancePercentage(String eventId) {

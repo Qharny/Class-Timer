@@ -403,7 +403,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(color: Colors.red),
             ),
             subtitle: const Text('Wipe everything from local storage'),
-            onTap: _handleResetData,
+            onTap: () => _showParentalGate(_handleResetData),
           ),
           const Divider(),
           _buildSectionHeader(context, 'Security & Privacy'),
@@ -411,23 +411,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
             onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Privacy Policy'),
-                  content: const SingleChildScrollView(
-                    child: Text(
-                      'Your data stays on your device. We do not collect or sell your personal information. Sync data is encrypted and sent directly to your provider.',
+              _showParentalGate(() {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Privacy Policy'),
+                    content: const SingleChildScrollView(
+                      child: Text(
+                        'Your data stays on your device. We do not collect or sell your personal information. Sync data is encrypted and sent directly to your provider.',
+                      ),
                     ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('CLOSE'),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('CLOSE'),
-                    ),
-                  ],
-                ),
-              );
+                );
+              });
             },
           ),
           const Divider(),
@@ -568,6 +570,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showParentalGate(VoidCallback onPassed) {
+    int num1 = 10 + (DateTime.now().millisecond % 10);
+    int num2 = 5 + (DateTime.now().microsecond % 10);
+    int sum = num1 + num2;
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Parental Gate'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please solve this to continue:'),
+            const SizedBox(height: 16),
+            Text(
+              '$num1 + $num2 = ?',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Answer',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (int.tryParse(controller.text) == sum) {
+                Navigator.pop(context);
+                onPassed();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Wrong answer. Try again.')),
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('CONTINUE'),
+          ),
+        ],
       ),
     );
   }

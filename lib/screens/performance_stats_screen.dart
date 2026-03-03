@@ -15,7 +15,7 @@ class _PerformanceStatsScreenState extends State<PerformanceStatsScreen> {
   @override
   Widget build(BuildContext context) {
     final productivity = _storageService.getUserProductivity();
-    final sessions = _storageService.studyBox.values.toList();
+    final sessions = _storageService.getAllStudySessions();
 
     // Calculate total hours
     double totalHours = 0;

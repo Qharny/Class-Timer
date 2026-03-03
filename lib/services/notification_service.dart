@@ -105,7 +105,8 @@ class NotificationService {
     );
 
     // 15-minute Reminder
-    if (storage.settingsBox.get('reminder_15_min', defaultValue: true)) {
+    if (storage.settingsBox?.get('reminder_15_min', defaultValue: true) ??
+        true) {
       final parts = event.startTime.split(':');
       final hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
@@ -142,7 +143,8 @@ class NotificationService {
     }
 
     // 5-minute Reminder
-    if (storage.settingsBox.get('reminder_5_min', defaultValue: true)) {
+    if (storage.settingsBox?.get('reminder_5_min', defaultValue: true) ??
+        true) {
       final parts = event.startTime.split(':');
       final hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
@@ -178,7 +180,8 @@ class NotificationService {
     }
 
     // Wrap-up Reminder
-    if (storage.settingsBox.get('reminder_wrap_up', defaultValue: true)) {
+    if (storage.settingsBox?.get('reminder_wrap_up', defaultValue: true) ??
+        true) {
       final endParts = event.endTime.split(':');
       final hour = int.parse(endParts[0]);
       final minute = int.parse(endParts[1]);
@@ -214,7 +217,10 @@ class NotificationService {
   Future<void> scheduleStreakReminder() async {
     final storage = LocalStorageService();
     if (!storage.getNotificationsEnabled()) return;
-    if (!storage.settingsBox.get('streak_reminder', defaultValue: true)) return;
+    if (!(storage.settingsBox?.get('streak_reminder', defaultValue: true) ??
+        true)) {
+      return;
+    }
 
     final stats = storage.getUserProductivity();
 
@@ -239,7 +245,8 @@ class NotificationService {
   Future<void> scheduleDailyMotivation() async {
     final storage = LocalStorageService();
     if (!storage.getNotificationsEnabled()) return;
-    if (!storage.settingsBox.get('daily_motivation', defaultValue: true)) {
+    if (!(storage.settingsBox?.get('daily_motivation', defaultValue: true) ??
+        true)) {
       return;
     }
 
