@@ -67,54 +67,56 @@ class NotificationService {
     if (!storage.getNotificationsEnabled()) return;
 
     final baseId = storage.getNotificationBaseId(event.id);
-
-    // Smart Buffer Dynamic Reminder
-    final bufferMinutes = storage.getReminderMinutes();
     final parts = event.startTime.split(':');
     final hour = int.parse(parts[0]);
     final minute = int.parse(parts[1]);
+    final alarmMode = storage.getAlarmModeEnabled();
 
-    DateTime scheduledTime = DateTime(
+    // Each of these notifications has its own id and doesn't depend on the
+    // others, so they don't need to be scheduled one at a time — awaiting
+    // them sequentially meant every class added N platform-channel round
+    // trips in a row (up to 4x), which added up fast during a bulk import.
+    final scheduling = <Future<void>>[];
+
+    // Smart Buffer Dynamic Reminder
+    final bufferMinutes = storage.getReminderMinutes();
+    final scheduledTime = DateTime(
       2024,
       1,
       1,
       hour,
       minute,
     ).subtract(Duration(minutes: bufferMinutes));
-
     final isCrisis = storage.isCrisisMode();
     final crisisPrefix = isCrisis ? '🚨 [CRISIS MODE] ' : '';
 
-    await AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: baseId + 4, // unique offset for dynamic buffer
-        channelKey: 'class_reminders',
-        title: '${crisisPrefix}Class Buffer Alert',
-        body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
-        notificationLayout: NotificationLayout.Default,
-        category: storage.getAlarmModeEnabled()
-            ? NotificationCategory.Alarm
-            : NotificationCategory.Reminder,
-      ),
-      schedule: NotificationCalendar(
-        weekday: event.dayOfWeek,
-        hour: scheduledTime.hour,
-        minute: scheduledTime.minute,
-        second: 0,
-        millisecond: 0,
-        repeats: true,
+    scheduling.add(
+      AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: baseId + 4, // unique offset for dynamic buffer
+          channelKey: 'class_reminders',
+          title: '${crisisPrefix}Class Buffer Alert',
+          body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
+          notificationLayout: NotificationLayout.Default,
+          category: alarmMode
+              ? NotificationCategory.Alarm
+              : NotificationCategory.Reminder,
+        ),
+        schedule: NotificationCalendar(
+          weekday: event.dayOfWeek,
+          hour: scheduledTime.hour,
+          minute: scheduledTime.minute,
+          second: 0,
+          millisecond: 0,
+          repeats: true,
+        ),
       ),
     );
 
     // 15-minute Reminder
     if (storage.settingsBox?.get('reminder_15_min', defaultValue: true) ??
         true) {
-      final parts = event.startTime.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-
-      // Calculate 15 mins before
-      DateTime dummy = DateTime(
+      final dummy = DateTime(
         2024,
         1,
         1,
@@ -122,24 +124,27 @@ class NotificationService {
         minute,
       ).subtract(const Duration(minutes: 15));
 
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: baseId + 1,
-          channelKey: 'class_reminders',
-          title: 'Class Starting Soon',
-          body: 'You have 15 minutes until ${event.title} at ${event.venue}.',
-          notificationLayout: NotificationLayout.Default,
-          category: storage.getAlarmModeEnabled()
-              ? NotificationCategory.Alarm
-              : NotificationCategory.Reminder,
-        ),
-        schedule: NotificationCalendar(
-          weekday: event.dayOfWeek,
-          hour: dummy.hour,
-          minute: dummy.minute,
-          second: 0,
-          millisecond: 0,
-          repeats: true,
+      scheduling.add(
+        AwesomeNotifications().createNotification(
+          content: NotificationContent(
+            id: baseId + 1,
+            channelKey: 'class_reminders',
+            title: 'Class Starting Soon',
+            body:
+                'You have 15 minutes until ${event.title} at ${event.venue}.',
+            notificationLayout: NotificationLayout.Default,
+            category: alarmMode
+                ? NotificationCategory.Alarm
+                : NotificationCategory.Reminder,
+          ),
+          schedule: NotificationCalendar(
+            weekday: event.dayOfWeek,
+            hour: dummy.hour,
+            minute: dummy.minute,
+            second: 0,
+            millisecond: 0,
+            repeats: true,
+          ),
         ),
       );
     }
@@ -147,11 +152,7 @@ class NotificationService {
     // 5-minute Reminder
     if (storage.settingsBox?.get('reminder_5_min', defaultValue: true) ??
         true) {
-      final parts = event.startTime.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = int.parse(parts[1]);
-
-      DateTime dummy = DateTime(
+      final dummy = DateTime(
         2024,
         1,
         1,
@@ -159,24 +160,26 @@ class NotificationService {
         minute,
       ).subtract(const Duration(minutes: 5));
 
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: baseId + 2,
-          channelKey: 'class_reminders',
-          title: 'Move Now!',
-          body: 'Time to head to ${event.venue}. Class starts in 5 minutes.',
-          notificationLayout: NotificationLayout.Default,
-          category: storage.getAlarmModeEnabled()
-              ? NotificationCategory.Alarm
-              : NotificationCategory.Reminder,
-        ),
-        schedule: NotificationCalendar(
-          weekday: event.dayOfWeek,
-          hour: dummy.hour,
-          minute: dummy.minute,
-          second: 0,
-          millisecond: 0,
-          repeats: true,
+      scheduling.add(
+        AwesomeNotifications().createNotification(
+          content: NotificationContent(
+            id: baseId + 2,
+            channelKey: 'class_reminders',
+            title: 'Move Now!',
+            body: 'Time to head to ${event.venue}. Class starts in 5 minutes.',
+            notificationLayout: NotificationLayout.Default,
+            category: alarmMode
+                ? NotificationCategory.Alarm
+                : NotificationCategory.Reminder,
+          ),
+          schedule: NotificationCalendar(
+            weekday: event.dayOfWeek,
+            hour: dummy.hour,
+            minute: dummy.minute,
+            second: 0,
+            millisecond: 0,
+            repeats: true,
+          ),
         ),
       );
     }
@@ -185,35 +188,38 @@ class NotificationService {
     if (storage.settingsBox?.get('reminder_wrap_up', defaultValue: true) ??
         true) {
       final endParts = event.endTime.split(':');
-      final hour = int.parse(endParts[0]);
-      final minute = int.parse(endParts[1]);
-
-      DateTime dummy = DateTime(
+      final endHour = int.parse(endParts[0]);
+      final endMinute = int.parse(endParts[1]);
+      final dummy = DateTime(
         2024,
         1,
         1,
-        hour,
-        minute,
+        endHour,
+        endMinute,
       ).subtract(const Duration(minutes: 5));
 
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: baseId + 3,
-          channelKey: 'class_reminders',
-          title: 'Wrap Up',
-          body: '${event.title} is ending soon. Prepare for transition.',
-          notificationLayout: NotificationLayout.Default,
-        ),
-        schedule: NotificationCalendar(
-          weekday: event.dayOfWeek,
-          hour: dummy.hour,
-          minute: dummy.minute,
-          second: 0,
-          millisecond: 0,
-          repeats: true,
+      scheduling.add(
+        AwesomeNotifications().createNotification(
+          content: NotificationContent(
+            id: baseId + 3,
+            channelKey: 'class_reminders',
+            title: 'Wrap Up',
+            body: '${event.title} is ending soon. Prepare for transition.',
+            notificationLayout: NotificationLayout.Default,
+          ),
+          schedule: NotificationCalendar(
+            weekday: event.dayOfWeek,
+            hour: dummy.hour,
+            minute: dummy.minute,
+            second: 0,
+            millisecond: 0,
+            repeats: true,
+          ),
         ),
       );
     }
+
+    await Future.wait(scheduling);
   }
 
   Future<void> scheduleStreakReminder() async {

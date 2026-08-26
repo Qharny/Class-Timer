@@ -245,6 +245,102 @@ Clutter / dead code:
   early skeleton files. lib/screens/home_screen.dart still exists as a
   non-functional, unrouted dead screen (Add button's onPressed is a no-op).
 
+NAVIGATION FIXES (2026-08-26)
+----------------------------------------------------------------------------
+- Fixed: MaterialApp's default onGenerateInitialRoutes always pushes '/'
+  beneath a non-'/' initialRoute (it's built for deep-link paths). This
+  silently put Onboarding under Program Setup / Dashboard at startup, so
+  pressing back from the first screen you saw landed on Onboarding.
+  lib/main.dart now supplies its own onGenerateInitialRoutes that resolves
+  only the single requested route.
+- Fixed: lib/widgets/event_card.dart pushed a named route '/event-detail'
+  that was never registered in main.dart — tapping a card in the
+  dashboard's "Today's Schedule" list failed to navigate. Route added; the
+  card now also awaits the navigation and calls an onChanged callback so
+  the list refreshes after viewing/editing/deleting that event (it
+  previously didn't, unlike the "Up Next" cards).
+- Fixed: EventDetailScreen's Edit button didn't await the edit screen or
+  refresh — since it's a StatelessWidget holding the event it opened with,
+  saving an edit left it showing stale data until backing out further. It
+  now awaits and pops itself on success.
+- Fixed: import_screen.dart's "Confirm & Sync" flow — any class that hit a
+  conflict during import went through ConflictResolutionScreen but was then
+  never actually saved (an unconditional `continue` skipped the
+  addClassEvent call regardless of how the conflict was resolved). Also now
+  keeps the running conflict-check state updated so two events within the
+  same import batch that overlap each other are caught too.
+
+PERFORMANCE / SMOOTHNESS PASS (2026-08-26)
+----------------------------------------------------------------------------
+- Added lib/widgets/processing_indicator.dart: a spinner + rotating status
+  text (e.g. "Reading your file...", "Detecting the timetable grid...")
+  replacing the bare CircularProgressIndicator during import parsing/OCR
+  and "Confirm & Sync", so a multi-second operation reads as progress
+  rather than a hang.
+- Fixed a real jank source: import_screen.dart's preview list built a new
+  TextEditingController per field on every rebuild, and every keystroke
+  called setState on the whole screen — so typing one character rebuilt
+  every previewed class's text fields, discarding cursor position each
+  time. Extracted to _EditableEventTile (own StatefulWidget, controllers
+  created once in initState, keyed by event id) so only the edited tile
+  rebuilds.
+- Same fix applied to grade_calculator_screen.dart's assessment rows
+  (extracted to _AssessmentTile). Also fixed a related bug found along the
+  way: the Score/Weight fields were fully uncontrolled TextFields with no
+  initial value, so they always rendered blank regardless of the
+  assessment's actual stored score/weight.
+- Hoisted repeated LocalStorageService() reads in main.dart's
+  DashboardScreen.build() — getUserProductivity() was being called ~7
+  times and isCrisisMode() twice per single build — into one read each,
+  reused via local variables.
+- Removed unused dependencies from pubspec.yaml: provider, path_provider,
+  google_fonts — none were imported anywhere in lib/ (verified via grep).
+  Hygiene/build-surface cleanup, not a runtime speedup (unused packages are
+  already excluded from the compiled binary by tree-shaking).
+- Considered and deliberately skipped: converting the dashboard's
+  shrinkWrap+NeverScrollableScrollPhysics nested ListView/GridView (inside
+  a SingleChildScrollView) to a CustomScrollView/Sliver-based layout. It's
+  the "textbook" fix for this pattern, but this app's realistic list sizes
+  (a handful of classes/courses) make the benefit marginal versus the risk
+  of a large layout rewrite. Worth revisiting if the "Today's Schedule" or
+  similar lists are ever expected to hold hundreds of items.
+
+TIMETABLE PROCESSING LATENCY FIX (2026-08-26)
+----------------------------------------------------------------------------
+Root cause of "processing takes a very long time" (Excel/CSV import path):
+lib/services/import_service.dart's parseExcel() called file.readAsBytesSync()
+and Excel.decodeBytes(bytes) — both synchronous, CPU-heavy (pure-Dart unzip +
+XML parse of the .xlsx) — directly on the main UI isolate. For any real
+spreadsheet this fully blocked the UI thread for the whole decode duration:
+no frames rendered at all, so even last session's new ProcessingIndicator
+spinner froze solid instead of animating, making it look properly hung
+rather than just slow. Fixed by running it via compute() (parseExcel is a
+pure static function of a File, safe to hand to a background isolate).
+Note: parseMatrixExcel (the matrix-Excel import path) has the same
+synchronous-decode pattern but was left alone — it also reads
+LocalStorageService().getProgram() from Hive inside the function body,
+which isn't safely available in a spawned isolate without extra work, and
+that path is currently dead code (not wired to any screen, see "Clutter /
+dead code" above) so it isn't part of the current complaint.
+
+Also fixed: NotificationService.scheduleClassReminders() awaited up to 4
+independent AwesomeNotifications().createNotification() calls sequentially
+per class (buffer/15-min/5-min/wrap-up reminders — different notification
+IDs, no dependency between them). During "Confirm & Sync" this runs once per
+imported class, so it compounded across a whole timetable. Now collects them
+into a list and awaits via Future.wait so they run concurrently instead.
+
+Known remaining latency source, not fixed (lower confidence / opt-in only):
+CalendarSyncService.syncEvent() calls _calendarPlugin.requestPermissions()
+and _calendarPlugin.retrieveCalendars() on every single call, i.e. once per
+event during a bulk import — redundant since the resolved calendar/
+permission state doesn't change within one sync batch. Only affects users
+who've enabled Calendar Sync (off by default). Left alone this pass since
+CalendarSyncService isn't a singleton and caching its resolved state safely
+(with correct invalidation when the user changes sync provider) needs more
+care than the two fixes above; worth doing if calendar-sync users report
+slow imports specifically.
+
 GIT / REPO STATE AT TIME OF WRITING
 -------------------------------------
 Branch: main. Working tree has a modified pubspec.lock. Recent commit history

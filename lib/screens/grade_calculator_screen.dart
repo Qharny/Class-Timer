@@ -53,6 +53,10 @@ class _GradeCalculatorScreenState extends State<GradeCalculatorScreen> {
     if (_examWeight < 0) _examWeight = 0;
   }
 
+  void _onAssessmentValueChanged() {
+    setState(_updateExamWeight);
+  }
+
   @override
   Widget build(BuildContext context) {
     final requiredScore = _requiredExamScore;
@@ -163,7 +167,15 @@ class _GradeCalculatorScreenState extends State<GradeCalculatorScreen> {
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = _assessments[index];
-                return _buildAssessmentTile(item, index);
+                return _AssessmentTile(
+                  key: ObjectKey(item),
+                  item: item,
+                  onDelete: () => setState(() {
+                    _assessments.removeAt(index);
+                    _updateExamWeight();
+                  }),
+                  onValueChanged: _onAssessmentValueChanged,
+                );
               },
             ),
 
@@ -181,84 +193,6 @@ class _GradeCalculatorScreenState extends State<GradeCalculatorScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAssessmentTile(AssessmentItem item, int index) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    border: InputBorder.none,
-                  ),
-                  onChanged: (v) => item.name = v,
-                  controller: TextEditingController(text: item.name),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () => setState(() {
-                  _assessments.removeAt(index);
-                  _updateExamWeight();
-                }),
-              ),
-            ],
-          ),
-          const Divider(),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSmallField(
-                  label: 'Score (%)',
-                  hint: '0',
-                  onChanged: (v) =>
-                      setState(() => item.score = double.tryParse(v) ?? 0),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildSmallField(
-                  label: 'Weight (%)',
-                  hint: 'Weight',
-                  onChanged: (v) => setState(() {
-                    item.weight = double.tryParse(v) ?? 0;
-                    _updateExamWeight();
-                  }),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSmallField({
-    required String label,
-    required String hint,
-    required ValueChanged<String> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        TextField(
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(hintText: hint, border: InputBorder.none),
-          onChanged: onChanged,
-        ),
-      ],
     );
   }
 
@@ -303,6 +237,152 @@ class _GradeCalculatorScreenState extends State<GradeCalculatorScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One assessment row. Owns its own TextEditingControllers so that editing
+/// one row's score/weight — which needs to trigger a parent rebuild to
+/// refresh the result card — doesn't recreate every row's controllers and
+/// reset their cursor position, the way inline `TextEditingController(...)`
+/// per rebuild would.
+class _AssessmentTile extends StatefulWidget {
+  final AssessmentItem item;
+  final VoidCallback onDelete;
+  final VoidCallback onValueChanged;
+
+  const _AssessmentTile({
+    super.key,
+    required this.item,
+    required this.onDelete,
+    required this.onValueChanged,
+  });
+
+  @override
+  State<_AssessmentTile> createState() => _AssessmentTileState();
+}
+
+class _AssessmentTileState extends State<_AssessmentTile> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _scoreController;
+  late final TextEditingController _weightController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.item.name);
+    _scoreController = TextEditingController(
+      text: _formatNum(widget.item.score),
+    );
+    _weightController = TextEditingController(
+      text: _formatNum(widget.item.weight),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _scoreController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  String _formatNum(double value) {
+    if (value == 0) return '';
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: InputBorder.none,
+                  ),
+                  controller: _nameController,
+                  onChanged: (v) => widget.item.name = v,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                onPressed: widget.onDelete,
+              ),
+            ],
+          ),
+          const Divider(),
+          Row(
+            children: [
+              Expanded(
+                child: _SmallField(
+                  label: 'Score (%)',
+                  hint: '0',
+                  controller: _scoreController,
+                  onChanged: (v) {
+                    widget.item.score = double.tryParse(v) ?? 0;
+                    widget.onValueChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SmallField(
+                  label: 'Weight (%)',
+                  hint: 'Weight',
+                  controller: _weightController,
+                  onChanged: (v) {
+                    widget.item.weight = double.tryParse(v) ?? 0;
+                    widget.onValueChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallField extends StatelessWidget {
+  final String label;
+  final String hint;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SmallField({
+    required this.label,
+    required this.hint,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(hintText: hint, border: InputBorder.none),
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }

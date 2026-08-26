@@ -282,6 +282,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final todayEvents = _getTodayEvents();
     final completedEvents = _getCompletedEvents(todayEvents);
     final userName = _storageService.getUserName();
+    // Read once per build instead of once per usage — these were each being
+    // re-read from Hive up to half a dozen times in a single build.
+    final stats = _getStats();
+    final crisisMode = _storageService.isCrisisMode();
 
     return Scaffold(
       appBar: AppBar(
@@ -343,7 +347,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const Icon(Icons.stars, color: Colors.amber, size: 20),
                       const SizedBox(width: 4),
                       Text(
-                        '${LocalStorageService().getUserProductivity().coins} Coins',
+                        '${stats.coins} Coins',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -357,7 +361,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${LocalStorageService().getUserProductivity().currentStreak}d Streak',
+                        '${stats.currentStreak}d Streak',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -432,11 +436,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ListTile(
               leading: Icon(
                 Icons.crisis_alert_outlined,
-                color: LocalStorageService().isCrisisMode() ? Colors.red : null,
+                color: crisisMode ? Colors.red : null,
               ),
               title: const Text('Crisis Mode (Exam Week)'),
               trailing: Switch(
-                value: LocalStorageService().isCrisisMode(),
+                value: crisisMode,
                 activeColor: Colors.red,
                 onChanged: (v) async {
                   await LocalStorageService().setCrisisMode(v);
@@ -462,7 +466,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Section: Greeting & Date & Streak
-            _buildHeader(userName, _getStats()),
+            _buildHeader(userName, stats),
             const SizedBox(height: 24),
 
             // Progress Section
@@ -476,19 +480,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 32),
 
             // Streak Milestones Section
-            if (_getStats().currentStreak > 0) ...[
+            if (stats.currentStreak > 0) ...[
               _buildSectionTitle('🏆 STREAK MILESTONES'),
               const SizedBox(height: 12),
-              _buildMilestones(_getStats()),
+              _buildMilestones(stats),
               const SizedBox(height: 32),
             ],
 
             // Analytics Section
             _buildSectionTitle('📊 PRODUCTIVITY ANALYTICS'),
             const SizedBox(height: 12),
-            _buildAnalyticsCard(_getStats()),
+            _buildAnalyticsCard(stats),
             const SizedBox(height: 16),
-            _buildFreezeCard(_getStats()),
+            _buildFreezeCard(stats),
             const SizedBox(height: 32),
 
             // Middle Section: Up Next

@@ -272,7 +272,12 @@ class _ImportScreenState extends State<ImportScreen> {
                       ),
                     ),
                   ),
-                  ...dayEvents.map((event) => _buildEditableEventTile(event)),
+                  ...dayEvents.map(
+                    (event) => _EditableEventTile(
+                      key: ObjectKey(event),
+                      event: event,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                 ],
               );
@@ -284,104 +289,6 @@ class _ImportScreenState extends State<ImportScreen> {
     );
   }
 
-  Widget _buildEditableEventTile(ClassEvent event) {
-    final theme = Theme.of(context);
-    final bool hasError = event.title.isEmpty || event.startTime.isEmpty;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: hasError ? Colors.red.withOpacity(0.05) : theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasError
-              ? Colors.red.withOpacity(0.3)
-              : theme.dividerColor.withOpacity(0.1),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    hintText: 'Subject Title',
-                  ),
-                  controller: TextEditingController(text: event.title),
-                  onChanged: (val) => setState(() => event.title = val),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Icon(Icons.edit_outlined, size: 14, color: Colors.grey),
-            ],
-          ),
-          const Divider(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          hintText: 'Start - End',
-                        ),
-                        controller: TextEditingController(
-                          text: '${event.startTime} - ${event.endTime}',
-                        ),
-                        onChanged: (val) {
-                          final parts = val.split('-');
-                          if (parts.length == 2) {
-                            setState(() {
-                              event.startTime = parts[0].trim();
-                              event.endTime = parts[1].trim();
-                            });
-                          }
-                        },
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          hintText: 'Venue',
-                        ),
-                        controller: TextEditingController(text: event.venue),
-                        onChanged: (val) => setState(() => event.venue = val),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildPreviewActions() {
     return Container(
@@ -503,5 +410,145 @@ class _ImportScreenState extends State<ImportScreen> {
       'Sunday',
     ];
     return days[day - 1];
+  }
+}
+
+/// One editable row in the import preview list. This owns its own
+/// TextEditingControllers instead of the parent screen creating fresh ones
+/// on every rebuild — with fresh controllers, a keystroke in any field on
+/// the page forced a full-list rebuild that recreated every field's
+/// controller, resetting cursor position and doing a lot of unnecessary
+/// work. Keeping state local means only this one tile rebuilds per keystroke.
+class _EditableEventTile extends StatefulWidget {
+  final ClassEvent event;
+
+  const _EditableEventTile({super.key, required this.event});
+
+  @override
+  State<_EditableEventTile> createState() => _EditableEventTileState();
+}
+
+class _EditableEventTileState extends State<_EditableEventTile> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _timeController;
+  late final TextEditingController _venueController;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.event.title);
+    _timeController = TextEditingController(
+      text: '${widget.event.startTime} - ${widget.event.endTime}',
+    );
+    _venueController = TextEditingController(text: widget.event.venue);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _timeController.dispose();
+    _venueController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool hasError =
+        widget.event.title.isEmpty || widget.event.startTime.isEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: hasError ? Colors.red.withOpacity(0.05) : theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasError
+              ? Colors.red.withOpacity(0.3)
+              : theme.dividerColor.withOpacity(0.1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: 'Subject Title',
+                  ),
+                  controller: _titleController,
+                  onChanged: (val) =>
+                      setState(() => widget.event.title = val),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Icon(Icons.edit_outlined, size: 14, color: Colors.grey),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: 'Start - End',
+                        ),
+                        controller: _timeController,
+                        onChanged: (val) {
+                          final parts = val.split('-');
+                          if (parts.length == 2) {
+                            setState(() {
+                              widget.event.startTime = parts[0].trim();
+                              widget.event.endTime = parts[1].trim();
+                            });
+                          }
+                        },
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 14,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: 'Venue',
+                        ),
+                        controller: _venueController,
+                        onChanged: (val) =>
+                            setState(() => widget.event.venue = val),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

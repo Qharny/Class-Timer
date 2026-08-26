@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,7 +23,12 @@ class ImportService {
     }
 
     final file = File(result.files.single.path!);
-    final parsedEvents = await parseExcel(file);
+    // Reading and decoding the .xlsx file is synchronous, CPU-heavy work
+    // (unzip + XML parse in pure Dart). Running it on the main isolate
+    // blocked the UI thread completely for the whole duration — no frames,
+    // no spinner animation, the app looked hung. compute() runs it on a
+    // background isolate instead, so the UI stays responsive while it works.
+    final parsedEvents = await compute(parseExcel, file);
 
     // Map ParsedEvent to ClassEvent for Hive storage (temporary mapping)
     return parsedEvents.map((pe) {
@@ -49,11 +55,14 @@ class ImportService {
     return parsedEvents.map((pe) => _mapParsedToClassEvent(pe)).toList();
   }
 
+  static int _idCounter = 0;
+
   ClassEvent _mapParsedToClassEvent(ParsedEvent pe) {
+    _idCounter++;
+    final uniqueId =
+        '${DateTime.now().microsecondsSinceEpoch}_${_idCounter}_${pe.title.hashCode.abs()}';
     return ClassEvent(
-      id:
-          DateTime.now().millisecondsSinceEpoch.toString() +
-          pe.title.hashCode.toString(),
+      id: uniqueId,
       title: pe.title,
       type: 'class',
       dayOfWeek: _dayToNum(pe.day),
