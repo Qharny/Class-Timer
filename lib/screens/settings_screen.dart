@@ -411,25 +411,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy Policy'),
             onTap: () {
-              _showParentalGate(() {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Privacy Policy'),
-                    content: const SingleChildScrollView(
-                      child: Text(
-                        'Your data stays on your device. We do not collect or sell your personal information. Sync data is encrypted and sent directly to your provider.',
-                      ),
+              // Privacy policies must stay freely accessible — no gate here.
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Privacy Policy'),
+                  content: const SingleChildScrollView(
+                    child: Text(
+                      'Your data stays on your device. We do not collect or sell your personal information. '
+                      'Location access is used only in the foreground, while the app is open, to notify you if '
+                      'you are far from campus as a class approaches — it is never transmitted off your device. '
+                      'If you enable Calendar Sync, your events are written directly to your chosen calendar '
+                      '(Google or device) using your device\'s own calendar app; we do not operate any servers '
+                      'and do not see or store that data ourselves.',
                     ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('CLOSE'),
-                      ),
-                    ],
                   ),
-                );
-              });
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('CLOSE'),
+                    ),
+                  ],
+                ),
+              );
             },
           ),
           const Divider(),

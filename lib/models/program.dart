@@ -22,6 +22,12 @@ class Program extends HiveObject {
   @HiveField(5)
   late String? group;
 
+  @HiveField(6)
+  double? campusLat;
+
+  @HiveField(7)
+  double? campusLng;
+
   Program({
     required this.institution,
     required this.name,
@@ -29,5 +35,7 @@ class Program extends HiveObject {
     required this.semester,
     this.department,
     this.group,
+    this.campusLat,
+    this.campusLng,
   });
 }

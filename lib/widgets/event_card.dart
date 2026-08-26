@@ -4,8 +4,9 @@ import '../services/local_storage_service.dart';
 
 class EventCard extends StatelessWidget {
   final ClassEvent event;
+  final VoidCallback? onChanged;
 
-  const EventCard({super.key, required this.event});
+  const EventCard({super.key, required this.event, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -27,8 +28,16 @@ class EventCard extends StatelessWidget {
         side: BorderSide(color: theme.dividerColor.withOpacity(0.1)),
       ),
       child: InkWell(
-        onTap: () =>
-            Navigator.pushNamed(context, '/event-detail', arguments: event),
+        onTap: () async {
+          await Navigator.pushNamed(
+            context,
+            '/event-detail',
+            arguments: event,
+          );
+          // The detail screen can edit or delete this event; refresh
+          // whatever list is showing this card so it doesn't go stale.
+          onChanged?.call();
+        },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16.0),

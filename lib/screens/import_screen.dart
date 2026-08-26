@@ -5,6 +5,7 @@ import '../models/domain_models.dart';
 import '../services/conflict_engine.dart';
 import './conflict_resolution_screen.dart';
 import '../services/local_storage_service.dart';
+import '../widgets/processing_indicator.dart';
 
 class ImportScreen extends StatefulWidget {
   const ImportScreen({super.key});
@@ -18,9 +19,36 @@ class _ImportScreenState extends State<ImportScreen> {
   final LocalStorageService _storageService = LocalStorageService();
   List<ClassEvent>? _previewEvents;
   bool _isLoading = false;
+  List<String> _loadingMessages = _parsingMessages;
+
+  static const _parsingMessages = [
+    'Reading your file...',
+    'Detecting the timetable grid...',
+    'Recognizing classes and times...',
+    'Cleaning up the details...',
+    'Almost there...',
+  ];
+
+  static const _scanningMessages = [
+    'Scanning your image...',
+    'Finding text on the page...',
+    'Matching days and time slots...',
+    'Building your class list...',
+    'Almost there...',
+  ];
+
+  static const _syncingMessages = [
+    'Checking for schedule conflicts...',
+    'Saving your classes...',
+    'Setting up reminders...',
+    'Syncing your timetable...',
+  ];
 
   Future<void> _handlePickFile() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingMessages = _parsingMessages;
+    });
     try {
       final events = await _importService.pickAndParseExcel();
       setState(() {
@@ -36,7 +64,10 @@ class _ImportScreenState extends State<ImportScreen> {
   }
 
   Future<void> _handlePickImage() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingMessages = _scanningMessages;
+    });
     try {
       final events = await _importService.pickAndParseImage();
       setState(() {
@@ -60,7 +91,7 @@ class _ImportScreenState extends State<ImportScreen> {
         backgroundColor: Colors.transparent,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? ProcessingIndicator(messages: _loadingMessages)
           : _previewEvents == null
           ? _buildDumpZone()
           : _buildPreview(),
@@ -377,7 +408,10 @@ class _ImportScreenState extends State<ImportScreen> {
           Expanded(
             child: ElevatedButton(
               onPressed: () async {
-                setState(() => _isLoading = true);
+                setState(() {
+                  _isLoading = true;
+                  _loadingMessages = _syncingMessages;
+                });
                 final existingEvents = _storageService.getAllClassEvents();
                 final existingEntities = existingEvents
                     .map((e) => EventEntity.fromClassEvent(e))
@@ -411,12 +445,22 @@ class _ImportScreenState extends State<ImportScreen> {
                         ),
                       ),
                     );
-                    // If they edited or accepted, we continue checking others
-                    // If they just popped without resolving, we might want to stop
-                    // but for now, let's assume one at a time.
-                    continue;
+                    if (mounted) {
+                      setState(() => _isLoading = true);
+                    }
+                    // Fall through: whichever way the user resolved it
+                    // (accept the suggestion, ignore, or edit manually), the
+                    // event still needs to actually be saved below — it must
+                    // not be silently dropped from the import.
                   }
+
                   await _storageService.addClassEvent(event);
+                  // Keep the running conflict-check state in sync so two
+                  // events within this same import batch that overlap each
+                  // other are also caught, not just overlaps against
+                  // pre-existing events.
+                  existingEvents.add(event);
+                  existingEntities.add(EventEntity.fromClassEvent(event));
                 }
 
                 if (mounted) {

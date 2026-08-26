@@ -108,9 +108,7 @@ class _ClassTimerProState extends State<ClassTimerPro> {
     _themeNotifier = ValueNotifier(widget.initialThemeMode);
 
     // Start periodic GPS check for Late Trigger
-    _locationCheckTimer = Timer.periodic(const Duration(minutes: 10), (
-      timer,
-    ) {
+    _locationCheckTimer = Timer.periodic(const Duration(minutes: 10), (timer) {
       unawaited(LocationService().checkProximityToCampus());
     });
 
@@ -137,91 +135,111 @@ class _ClassTimerProState extends State<ClassTimerPro> {
           darkTheme: AppTheme.darkTheme,
           themeMode: currentMode,
           initialRoute: widget.initialRoute,
-          onGenerateRoute: (settings) {
-            switch (settings.name) {
-              case '/':
-                return RouteTransitions.fade(
-                  page: const OnboardingScreen(),
-                  settings: settings,
-                );
-              case '/dashboard':
-                return RouteTransitions.fade(
-                  page: const DashboardScreen(),
-                  settings: settings,
-                );
-              case '/import':
-                return RouteTransitions.slideBottom(
-                  page: const ImportScreen(),
-                  settings: settings,
-                );
-              case '/focus-mode':
-                final event = settings.arguments as ClassEvent;
-                return RouteTransitions.scale(
-                  page: FocusModeScreen(event: event),
-                  settings: settings,
-                );
-              case '/settings':
-                return RouteTransitions.slideBottom(
-                  page: SettingsScreen(
-                    onThemeChanged: () {
-                      _themeNotifier.value = LocalStorageService()
-                          .getThemeMode();
-                    },
-                    onNameChanged: () {
-                      setState(() {}); // Refresh dashboard greeting
-                    },
-                  ),
-                  settings: settings,
-                );
-              case '/program-setup':
-                final isInitial = settings.arguments as bool? ?? true;
-                return RouteTransitions.fade(
-                  page: ProgramSetupScreen(isInitialSetup: isInitial),
-                  settings: settings,
-                );
-              case '/course-management':
-                return RouteTransitions.slideRight(
-                  page: const CourseManagementScreen(),
-                  settings: settings,
-                );
-              case '/timetable-explorer':
-                return RouteTransitions.slideRight(
-                  page: const TimetableExplorerScreen(),
-                  settings: settings,
-                );
-              case '/grade-calculator':
-                return RouteTransitions.slideRight(
-                  page: const GradeCalculatorScreen(),
-                  settings: settings,
-                );
-              case '/study-planner':
-                return RouteTransitions.slideRight(
-                  page: const StudyPlannerScreen(),
-                  settings: settings,
-                );
-              case '/performance-stats':
-                return RouteTransitions.slideRight(
-                  page: const PerformanceStatsScreen(),
-                  settings: settings,
-                );
-              case '/absence-tracker':
-                return RouteTransitions.slideRight(
-                  page: const AbsenceTrackerScreen(),
-                  settings: settings,
-                );
-              case '/edit-event':
-                final event = settings.arguments as ClassEvent?;
-                return RouteTransitions.slideBottom(
-                  page: EditEventScreen(event: event),
-                  settings: settings,
-                );
-              default:
-                return null;
-            }
+          // MaterialApp's default onGenerateInitialRoutes always pushes '/'
+          // beneath a non-'/' initialRoute (it's built for deep-link path
+          // segments like '/stocks/HOOLI' -> '/', '/stocks', '/stocks/HOOLI').
+          // For a flat initial route like '/program-setup' that means
+          // Onboarding silently sits underneath it, so pressing back from
+          // the very first screen a user sees lands them on Onboarding.
+          // Generate only the single requested initial route instead.
+          onGenerateInitialRoutes: (initialRouteName) {
+            final route = _onGenerateRoute(
+              RouteSettings(name: initialRouteName),
+            );
+            return route != null ? [route] : [];
           },
+          onGenerateRoute: _onGenerateRoute,
         );
       },
     );
+  }
+
+  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    switch (settings.name) {
+      case '/':
+        return RouteTransitions.fade(
+          page: const OnboardingScreen(),
+          settings: settings,
+        );
+      case '/dashboard':
+        return RouteTransitions.fade(
+          page: const DashboardScreen(),
+          settings: settings,
+        );
+      case '/import':
+        return RouteTransitions.slideBottom(
+          page: const ImportScreen(),
+          settings: settings,
+        );
+      case '/focus-mode':
+        final event = settings.arguments as ClassEvent;
+        return RouteTransitions.scale(
+          page: FocusModeScreen(event: event),
+          settings: settings,
+        );
+      case '/settings':
+        return RouteTransitions.slideBottom(
+          page: SettingsScreen(
+            onThemeChanged: () {
+              _themeNotifier.value = LocalStorageService().getThemeMode();
+            },
+            onNameChanged: () {
+              setState(() {}); // Refresh dashboard greeting
+            },
+          ),
+          settings: settings,
+        );
+      case '/program-setup':
+        final isInitial = settings.arguments as bool? ?? true;
+        return RouteTransitions.fade(
+          page: ProgramSetupScreen(isInitialSetup: isInitial),
+          settings: settings,
+        );
+      case '/course-management':
+        return RouteTransitions.slideRight(
+          page: const CourseManagementScreen(),
+          settings: settings,
+        );
+      case '/timetable-explorer':
+        return RouteTransitions.slideRight(
+          page: const TimetableExplorerScreen(),
+          settings: settings,
+        );
+      case '/grade-calculator':
+        return RouteTransitions.slideRight(
+          page: const GradeCalculatorScreen(),
+          settings: settings,
+        );
+      case '/study-planner':
+        return RouteTransitions.slideRight(
+          page: const StudyPlannerScreen(),
+          settings: settings,
+        );
+      case '/performance-stats':
+        return RouteTransitions.slideRight(
+          page: const PerformanceStatsScreen(),
+          settings: settings,
+        );
+      case '/absence-tracker':
+        return RouteTransitions.slideRight(
+          page: const AbsenceTrackerScreen(),
+          settings: settings,
+        );
+      case '/edit-event':
+        final event = settings.arguments as ClassEvent?;
+        return RouteTransitions.slideBottom(
+          page: EditEventScreen(event: event),
+          settings: settings,
+        );
+      case '/event-detail':
+        final event = settings.arguments as ClassEvent;
+        return RouteTransitions.slideRight(
+          page: EventDetailScreen(event: event),
+          settings: settings,
+        );
+      default:
+        return null;
+    }
   }
 }
 
@@ -506,7 +524,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: todayEvents.length,
                   itemBuilder: (context, index) {
-                    return EventCard(event: todayEvents[index]);
+                    return EventCard(
+                      event: todayEvents[index],
+                      onChanged: _loadEvents,
+                    );
                   },
                 )
               else

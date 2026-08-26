@@ -29,8 +29,19 @@ class EventDetailScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              Navigator.pushNamed(context, '/edit-event', arguments: event);
+            onPressed: () async {
+              // This screen is stateless and holds the event it was opened
+              // with, so it can't reflect an edit made on top of it. Pop
+              // back to the caller (which reloads) instead of leaving the
+              // user looking at now-stale details.
+              final changed = await Navigator.pushNamed(
+                context,
+                '/edit-event',
+                arguments: event,
+              );
+              if (changed == true && context.mounted) {
+                Navigator.pop(context);
+              }
             },
           ),
           IconButton(

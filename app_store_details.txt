@@ -24,4 +24,7 @@ Stop worrying about missing classes and start focusing on your academic success.
 Permission Usage & Data Disclosure:
 ------------------------------------
 - Photos and Media (READ_MEDIA_IMAGES): We allow you to upload images of your class timetable solely for the purpose of automatic schedule extraction. Our app use on-device text recognition (OCR) to convert your images into events. We do not store or transmit your photos to any external servers.
-- Location (ACCESS_FINE_LOCATION): We use your background location to provide "Smart Buffer Alerts." This allows the app to notify you if you are still far from your campus venue when a class is about to start. Your location data is processed only on-device and is never shared. (558 chars)
+- Location (ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION): We use your location, only while the app is open in the foreground, to provide "Smart Buffer Alerts." This allows the app to notify you if you are still far from your campus venue when a class is about to start. We do not request background location access. Your location data is processed only on-device and is never shared.
+- Calendar (READ_CALENDAR, WRITE_CALENDAR): If you enable optional Calendar Sync, we write your class events directly to your chosen calendar (Google Calendar or your device's calendar) via the device's own calendar app. We do not operate any servers and do not otherwise access, store, or share your calendar data.
+
+NOTE: A hosted, publicly reachable Privacy Policy URL must be added to the Play Console "App content" > "Privacy policy" field before submission — the in-app Privacy Policy dialog does not satisfy this requirement on its own.

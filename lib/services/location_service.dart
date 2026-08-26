@@ -8,12 +8,16 @@ class LocationService {
   factory LocationService() => _instance;
   LocationService._internal();
 
-  // Mock Campus Coordinates (e.g. University of Ghana)
-  static const double campusLat = 5.6506;
-  static const double campusLng = -0.1962;
-
   Future<void> checkProximityToCampus() async {
     try {
+      // Only run if the user has actually set their campus location — we
+      // must not request/act on location for a feature that has nothing
+      // real to compare against.
+      final program = LocalStorageService().getProgram();
+      final campusLat = program?.campusLat;
+      final campusLng = program?.campusLng;
+      if (campusLat == null || campusLng == null) return;
+
       bool serviceEnabled;
       LocationPermission permission;
 
@@ -42,6 +46,30 @@ class LocationService {
       }
     } catch (e) {
       debugPrint('LocationService checkProximityToCampus error: $e');
+    }
+  }
+
+  /// Requests location permission if needed and returns the device's
+  /// current position, for an explicit, user-initiated action (e.g. "set my
+  /// campus location" while the user is standing on campus). Returns null
+  /// if location services/permissions aren't available.
+  Future<Position?> captureCurrentPosition() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition();
+    } catch (e) {
+      debugPrint('LocationService captureCurrentPosition error: $e');
+      return null;
     }
   }
 

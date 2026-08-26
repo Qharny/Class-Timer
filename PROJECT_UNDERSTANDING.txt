@@ -187,9 +187,6 @@ Implemented as stubs despite README claims:
 - Focus Mode Do Not Disturb: lib/services/focus_mode_service.dart
   startSession/endSession are empty bodies (`// Future:
   flutter_dnd.setDoNotDisturb(true)`) — no real DND/app-blocking occurs.
-- Location "late trigger": lib/services/location_service.dart:11-13
-  hardcodes one mock campus lat/lng ("Mock Campus Coordinates (e.g.
-  University of Ghana)"), not configurable per user.
 - PDF import: lib/screens/import_screen.dart:132 shows "PDF support is
   coming soon!" — not implemented.
 - Google Calendar two-way sync: only device_calendar (native, one-way push)
@@ -201,6 +198,46 @@ Implemented as stubs despite README claims:
   PM," silently misconverting legitimate early-morning classes (e.g. a
   6:00 AM class becomes 18:00). Also assumes one fixed grid layout
   (venues as rows, time slots as columns).
+
+GOOGLE PLAY POLICY REVIEW (2026-08-26)
+----------------------------------------------------------------------------
+Reviewed AndroidManifest.xml permissions, app_store_details.txt disclosure
+text, and settings_screen.dart's privacy/parental-gate UI against Play
+policy. Fixed:
+- Location permission disclosure mismatch: app_store_details.txt and the
+  in-app privacy dialog claimed "background location" use, but the app only
+  ever requests foreground ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION (no
+  ACCESS_BACKGROUND_LOCATION is declared or requested). Text corrected to
+  accurately describe foreground-only use in both places.
+- Non-functional location feature / unjustified permission: LocationService
+  used to compare against a hardcoded mock campus coordinate, so the
+  location permission was requested for a feature that couldn't work for
+  real users. Now: Program (lib/models/program.dart) carries optional
+  campusLat/campusLng, set via a new "Use Current Location" action on
+  Program Setup (lib/screens/program_setup_screen.dart) that the user
+  triggers explicitly while on campus. LocationService.checkProximityToCampus
+  now reads the stored campus location and returns immediately (no
+  permission prompt, no check) if it hasn't been set — location is never
+  touched until the user has opted into a working feature.
+- Privacy Policy was gated behind _showParentalGate() (a math-puzzle
+  challenge) in settings_screen.dart — removed; privacy policies must stay
+  freely accessible. The parental gate is still used for the destructive
+  "Clear All Data" action.
+- Privacy text overstated calendar sync as "encrypted and sent directly to
+  your provider" — corrected to describe what CalendarSyncService actually
+  does (writes to the device's own calendar app via device_calendar; no
+  servers, no app-level encryption layer).
+
+Still needed before Play submission (not code — Play Console / hosting):
+- A real, hosted, publicly reachable Privacy Policy URL added to Play
+  Console's App Content > Privacy Policy field. The in-app dialog does not
+  satisfy this on its own.
+- Complete the Play Console permissions declaration forms for: Alarms &
+  Reminders (SCHEDULE_EXACT_ALARM), Calendar (READ_CALENDAR/WRITE_CALENDAR),
+  and Location (ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION).
+- Confirm the Play Console "target audience" declaration matches reality —
+  the app requests Location/Calendar, which are heavily restricted if the
+  audience declaration includes under-13 users (Play Families policy).
 
 Clutter / dead code:
 - lib/file.dart is a leftover one-off scaffolding script (has its own

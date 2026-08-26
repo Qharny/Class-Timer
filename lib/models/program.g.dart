@@ -23,13 +23,15 @@ class ProgramAdapter extends TypeAdapter<Program> {
       semester: fields[3] as int,
       department: fields[4] as String?,
       group: fields[5] as String?,
+      campusLat: fields[6] as double?,
+      campusLng: fields[7] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Program obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.institution)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class ProgramAdapter extends TypeAdapter<Program> {
       ..writeByte(4)
       ..write(obj.department)
       ..writeByte(5)
-      ..write(obj.group);
+      ..write(obj.group)
+      ..writeByte(6)
+      ..write(obj.campusLat)
+      ..writeByte(7)
+      ..write(obj.campusLng);
   }
 
   @override
