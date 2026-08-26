@@ -1,0 +1,218 @@
+================================================================================
+CLASS TIMER PRO — PROJECT UNDERSTANDING
+(Written by Claude on 2026-08-26 after reviewing the codebase)
+================================================================================
+
+WHAT IT IS
+----------
+Class Timer Pro is a Flutter app (package name "class_timer", v1.0.0+5) that
+functions as an offline-first academic scheduling assistant for students. It
+goes beyond a plain timetable/reminder app by combining:
+  - Multiple ways to get a timetable into the app (manual entry, Excel import,
+    matrix/grid-style OCR import from photos)
+  - Conflict detection between classes/study sessions
+  - Notifications with "smart buffer" contextual reminders
+  - A Focus Mode for study sessions
+  - Gamified productivity tracking (streaks, coins, streak freezes)
+  - Academic tools: grade calculator, absence tracker, study planner,
+    performance stats, course/program management, timetable explorer
+
+The README.md and logic_and_algorithm.txt describe an ambitious full vision
+(AI OCR from photos/PDFs, Google Calendar two-way sync, predictive scheduling
+etc.) — these read as a product spec / roadmap. The actual codebase implements
+a meaningful subset of this, described below.
+
+TECH STACK
+----------
+- Flutter, Dart SDK ^3.11.0
+- State/data: Provider (declared, though most screens use direct
+  StatefulWidget + service calls rather than heavy Provider usage)
+- Local storage: Hive + hive_flutter (offline-first persistence), with
+  hive_generator/build_runner for generated adapters (*.g.dart files)
+- Excel import: `excel` package + `file_picker`
+- OCR: `google_mlkit_text_recognition` + `image_picker` (for photographed/
+  screenshotted timetables — "matrix" grid parsing, not general PDF/AI OCR)
+- Notifications: `awesome_notifications` + `timezone`
+- Calendar: `device_calendar` (native device calendar sync)
+- Location: `geolocator` (used for a "proximity to campus" late-trigger
+  feature, checked periodically from main.dart)
+- Audio: `just_audio` (focus mode ambient/focus sounds)
+- Theming: `google_fonts`, `flutter_svg`, custom AppTheme with light/dark mode
+- Icons: `flutter_launcher_icons` configured against assets/logo.png
+
+PROJECT STRUCTURE
+------------------
+lib/
+├── main.dart              — App entry, Hive/notification init, route table,
+│                             and the DashboardScreen itself (large — hosts
+│                             streaks/coins UI, quick actions, up-next list,
+│                             today's schedule, all inline in main.dart)
+├── data/
+│   ├── datasources/       — excel_matrix_parser_datasource.dart (parses
+│   │                         Excel-based timetable "matrix" grids)
+│   ├── models/             — event_model, student_profile_model (+ .g.dart
+│   │                         Hive adapters), parsing_helpers.dart
+├── domain/
+│   └── usecases/           — import_matrix_timetable.dart (use-case wrapping
+│                              the matrix import flow — a light clean-
+│                              architecture layer coexisting with the more
+│                              direct lib/models + lib/services code)
+├── models/                — Hive-backed domain models: ClassEvent, Course,
+│                             Program, StudySession, UserProductivity,
+│                             AttendanceRecord, ClassModel, plus
+│                             domain_models.dart. Most have generated .g.dart
+│                             Hive TypeAdapters.
+├── services/               — Business logic layer:
+│     - local_storage_service.dart   Hive boxes: events, program, courses,
+│                                     productivity, settings, onboarding flag
+│     - matrix_parser_service.dart   OCR/grid timetable parsing
+│                                     (MatrixScheduleParserService)
+│     - import_service.dart          Orchestrates Excel/manual import
+│     - conflict_engine.dart         Core overlap-detection logic
+│                                     (ConflictSeverity: hard/soft)
+│     - conflict_crusher.dart        Higher-level conflict resolution/UX glue
+│     - conflict_service.dart        Additional conflict-related logic
+│     - rescheduling_engine.dart     Suggests alternative time slots for
+│                                     conflicting events (own DateTimeRange
+│                                     helper class)
+│     - notification_service.dart    awesome_notifications wrapper: schedule,
+│                                     reschedule all, request permissions
+│     - focus_mode_service.dart      Focus Mode session logic
+│     - focus_sound_service.dart     just_audio-based ambient sound playback
+│     - calendar_sync_service.dart   device_calendar integration
+│     - location_service.dart        geolocator-based proximity/late-trigger
+│                                     checks (polled every 10 min from
+│                                     main.dart)
+├── screens/                — ~18 screens: onboarding, home/dashboard,
+│                             import, add/edit class & event, event detail,
+│                             conflict resolution, course management,
+│                             program setup, timetable explorer, focus mode,
+│                             grade calculator, absence tracker, study
+│                             planner, performance stats, settings
+├── theme/                  — AppColors, AppTheme (light/dark), custom page
+│                             route + transitions (RouteTransitions: fade,
+│                             slideBottom, slideRight, scale)
+└── widgets/                — ClassCard, EventCard, TimerBar (reusable UI)
+
+test/
+  - engine_test.dart, matrix_parser_test.dart, widget_test.dart
+  (unit tests exist for the parsing/conflict engines, not just widget smoke
+  tests — suggests the parsing and conflict logic are treated as
+  correctness-critical)
+
+KEY OBSERVATIONS / ARCHITECTURE NOTES
+--------------------------------------
+- There are two coexisting model/architecture styles: a simpler
+  lib/models + lib/services structure (most of the app) and a small
+  clean-architecture-flavored lib/data + lib/domain slice specifically for
+  the Excel "matrix" timetable import (event_model, student_profile_model,
+  import_matrix_timetable use case). This suggests the matrix-import feature
+  was built/refactored more recently or by a different pass than the rest.
+- Conflict detection is split across three files (conflict_engine,
+  conflict_crusher, conflict_service) — worth checking for overlap/duplication
+  if working in this area.
+- main.dart is doing double duty as both app bootstrap/routing AND the full
+  DashboardScreen implementation (over 1000 lines) — a candidate for
+  extraction into lib/screens/home_screen.dart-style organization (note:
+  lib/screens/home_screen.dart already exists separately, so DashboardScreen
+  in main.dart may be legacy/duplicate — worth clarifying before editing).
+- Gamification (coins, streaks, streak freezes, milestone badges at 3/7/30/100
+  days) is a fully implemented feature, not just in the roadmap — tracked via
+  UserProductivity (Hive model) and LocalStorageService.
+- Crisis Mode (exam week) is a toggle in the drawer, persisted via
+  LocalStorageService.isCrisisMode()/setCrisisMode() — implies some downstream
+  behavior (likely more aggressive study reminders) elsewhere in the app.
+- Routing is a manual onGenerateRoute switch (no go_router/named nav package),
+  with custom transition helpers per route.
+- Global error handling is set up in main() (FlutterError.onError and
+  PlatformDispatcher.onError) with a fallback error Scaffold if startup fails.
+
+CURRENT STATE VS. THE README ROADMAP
+--------------------------------------
+Implemented: Excel/matrix import, OCR-based grid parsing (ML Kit), manual
+class entry, conflict detection + rescheduling suggestions, local
+notifications with buffer-style reminders, Focus Mode with sound, device
+calendar sync, streaks/gamification, grade calculator, absence tracker,
+study planner, performance stats, location-based proximity checks.
+
+Per the README's "Version Roadmap," this app looks to be somewhere around
+v1.5–v2.0 in ambition (Excel import + conflict detection done; some AI/OCR
+image scan and calendar sync done as well) rather than strictly v1.0. General
+PDF import and true two-way Google Calendar sync do not appear implemented
+(device_calendar is used instead of a Google Calendar API integration).
+
+KNOWN ISSUES (verified 2026-08-26 via flutter analyze/test + code reading)
+----------------------------------------------------------------------------
+`flutter analyze` is clean and `flutter test` passes except for one real bug
+(#8 below). Issues found by actually reading service implementations and
+their call sites, not just the docs:
+
+Confirmed bugs:
+1. "Wipe everything" doesn't wipe everything.
+   lib/services/local_storage_service.dart:181 clearAllData() only clears
+   classBox/studyBox/settingsBox. courseBox, programBox, productivityBox
+   (streaks/coins), and attendanceBox survive. Settings screen advertises
+   this as "Wipe everything from local storage"
+   (lib/screens/settings_screen.dart:405).
+2. Streak milestone bonus coins (+10 @ 7-day streak, +50 @ 30-day streak)
+   are lost on app restart. lib/services/local_storage_service.dart:364-381
+   updateStreak() — productivityBox.put('stats', stats) happens BEFORE the
+   milestone bonus mutates stats.coins, and there's no follow-up save/put,
+   so the bonus never reaches disk.
+3. Attendance record key collisions. local_storage_service.dart:405
+   markAttendance() key = '${eventId}_${date.year}${date.month}${date.day}'
+   with no zero-padding — e.g. Jan 15 and Nov 5 both produce suffix "115",
+   silently overwriting each other's attendance record.
+4. No conflict detection on manual add/edit. ConflictEngine is only called
+   from the import flow (lib/screens/import_screen.dart:388). Add Class /
+   Edit Event screens never check for overlaps. ConflictService
+   (lib/services/conflict_service.dart) is entirely unused/dead code.
+5. ConflictCrusher (used by the matrix-Excel import path,
+   lib/services/conflict_crusher.dart:15) only compares adjacent events
+   after sorting by start time — misses overlaps between non-adjacent
+   events (A and C overlapping around a shorter B in between).
+6. Reschedule suggestions ignore day-of-week.
+   lib/screens/conflict_resolution_screen.dart:54 _toEntity() stamps every
+   event with DateTime.now()'s date, dropping dayOfWeek (comment admits
+   "Simplified: assuming today for suggestion") — can produce wrong
+   "Suggested Fix" times.
+7. Notification IDs built from event.id.hashCode
+   (lib/services/notification_service.dart:88,125,162,199) — not guaranteed
+   to fit a 32-bit int or be collision-free; two events can silently
+   overwrite each other's scheduled reminders.
+8. Timer leak / failing test: main.dart:110's 10-minute GPS proximity
+   Timer.periodic in _ClassTimerProState is never cancelled (no dispose()
+   override). Causes "Timer is still pending" failure in
+   test/widget_test.dart's onboarding smoke test.
+
+Implemented as stubs despite README claims:
+- Focus Mode Do Not Disturb: lib/services/focus_mode_service.dart
+  startSession/endSession are empty bodies (`// Future:
+  flutter_dnd.setDoNotDisturb(true)`) — no real DND/app-blocking occurs.
+- Location "late trigger": lib/services/location_service.dart:11-13
+  hardcodes one mock campus lat/lng ("Mock Campus Coordinates (e.g.
+  University of Ghana)"), not configurable per user.
+- PDF import: lib/screens/import_screen.dart:132 shows "PDF support is
+  coming soon!" — not implemented.
+- Google Calendar two-way sync: only device_calendar (native, one-way push)
+  is implemented; no Google OAuth/API integration.
+- Cloud backup: settings_screen.dart:382 shows "Backup service coming
+  soon."
+- Matrix/OCR time parsing heuristic is fragile:
+  lib/services/matrix_parser_service.dart:119-129 assumes "hour < 7 means
+  PM," silently misconverting legitimate early-morning classes (e.g. a
+  6:00 AM class becomes 18:00). Also assumes one fixed grid layout
+  (venues as rows, time slots as columns).
+
+Clutter / dead code:
+- lib/file.dart is a leftover one-off scaffolding script (has its own
+  main()) that originally generated lib/screens/home_screen.dart and other
+  early skeleton files. lib/screens/home_screen.dart still exists as a
+  non-functional, unrouted dead screen (Add button's onPressed is a no-op).
+
+GIT / REPO STATE AT TIME OF WRITING
+-------------------------------------
+Branch: main. Working tree has a modified pubspec.lock. Recent commit history
+(fd2ca1c "update", 35c2ae5 "modifed", 809fbff "build apk", 543207d "changed
+app version", 6521ada "modified") suggests active, iterative solo development
+with terse commit messages rather than a structured release process.
