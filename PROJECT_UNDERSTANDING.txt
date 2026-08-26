@@ -366,6 +366,45 @@ Fixed at both levels:
   it's now skipped and reported by name in the completion SnackBar instead
   of hanging the screen.
 
+TIMETABLE PROCESSING BROUGHT IN LINE WITH logic_and_algorithm.txt (2026-08-26)
+----------------------------------------------------------------------------
+The doc's Universal Import Engine section describes two things the actual
+code didn't do yet — implemented both, in lib/services/import_service.dart:
+
+1. Excel/CSV "Mapping: Detects headers (Day, Subject, Start Time, End Time)
+   and maps column data to Structured Event objects." parseExcel() used to
+   hardcode column positions (row[0]=day, row[1]=title, ... — the code
+   literally said "// Basic header detection (future: dynamic mapping)").
+   Added _detectColumnMapping(): scans the first 5 rows for a header row,
+   matches each cell's text against keyword lists (day/weekday,
+   subject|course|class|title|unit|name, start|from|begin, end|to|finish,
+   venue|room|location|hall) in any order/position, and maps columns by
+   name. Falls back to the old fixed Day|Subject|Start|End|Venue layout if
+   no header row is recognized, so already-correctly-ordered files still
+   work unchanged.
+
+2. OCR "Heuristic Association: Associates text blocks (Course Names) found
+   immediately near detected time ranges with those specific events."
+   reconstructFromOCR() (renamed from _reconstructFromOCR — Dart privacy is
+   per-file, made public so it's unit-testable) used to only find a title
+   by stripping the time range out of the SAME text block — meaning a
+   timetable screenshot where ML Kit recognizes the course name and its
+   time as two separate blocks (very common for grid/table screenshots)
+   produced a class with no title at all. Now does two passes: classify
+   every block as a day header / time-range (with optional inline title) /
+   title candidate, then for every time range without an inline title,
+   associate the spatially nearest unclaimed title-candidate block by
+   bounding-box center distance, capped at 3x the time block's own height
+   so it won't grab an unrelated block on a sparse image.
+
+Both are covered by test/import_service_test.dart (5 new tests: header
+mapping in non-standard column order, fallback to fixed layout, OCR
+cross-block association, the original same-block case still working, and
+a control case confirming a too-far-away block is correctly NOT
+associated). TextBlock/RecognizedText from google_mlkit_text_recognition
+have public constructors, so these are constructed directly rather than
+mocked. Full suite: 12/12 passing, flutter analyze clean.
+
 GIT / REPO STATE AT TIME OF WRITING
 -------------------------------------
 Branch: main. Working tree has a modified pubspec.lock. Recent commit history

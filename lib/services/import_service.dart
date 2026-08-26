@@ -49,7 +49,7 @@ class ImportService {
       inputImage,
     );
 
-    final List<ParsedEvent> parsedEvents = _reconstructFromOCR(recognizedText);
+    final List<ParsedEvent> parsedEvents = reconstructFromOCR(recognizedText);
     textRecognizer.close();
 
     return parsedEvents.map((pe) => _mapParsedToClassEvent(pe)).toList();
@@ -74,52 +74,112 @@ class ImportService {
     );
   }
 
-  List<ParsedEvent> _reconstructFromOCR(RecognizedText recognizedText) {
-    final List<ParsedEvent> events = [];
+  static final RegExp _dayRegex = RegExp(
+    r'(monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
+    caseSensitive: false,
+  );
+  static final RegExp _timeRangeRegex = RegExp(
+    r'(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})',
+  );
+
+  /// Reconstructs events from OCR text blocks.
+  ///
+  /// A timetable screenshot is a grid, and ML Kit returns one text block per
+  /// roughly-contiguous region — a course name and its time range often land
+  /// in two separate blocks rather than one combined block. This does two
+  /// passes: first classify every block as a day header, a time range (with
+  /// an optional inline title, for the case where both are one block), or a
+  /// plain title candidate; then for every time range without an inline
+  /// title, associate it with whichever nearby title-candidate block is
+  /// spatially closest — this is the "Heuristic Association" step.
+  List<ParsedEvent> reconstructFromOCR(RecognizedText recognizedText) {
+    // Reading order (top-to-bottom, then left-to-right within a row) so day
+    // headers get picked up before the events listed beneath them,
+    // regardless of the order ML Kit happens to return blocks in.
+    final blocks = List<TextBlock>.from(recognizedText.blocks)
+      ..sort((a, b) {
+        final rowCompare = a.boundingBox.top.compareTo(b.boundingBox.top);
+        if ((a.boundingBox.top - b.boundingBox.top).abs() > 10) {
+          return rowCompare;
+        }
+        return a.boundingBox.left.compareTo(b.boundingBox.left);
+      });
+
+    final timeBlocks = <_OcrTimeBlock>[];
+    final titleCandidates = <TextBlock>[];
     String currentDay = 'Monday';
 
-    // Basic heuristic: Group text blocks by proximity or sequence
-    // This is a simplified version of the "hardest" part mentioned in architecture
-    for (TextBlock block in recognizedText.blocks) {
-      final String text = block.text.trim();
+    for (final block in blocks) {
+      final text = block.text.trim();
+      if (text.isEmpty) continue;
 
-      // Detect Day
-      final dayMatch = RegExp(
-        r'(monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
-        caseSensitive: false,
-      ).firstMatch(text);
-      if (dayMatch != null) {
+      final dayMatch = _dayRegex.firstMatch(text);
+      // Treat short blocks that are essentially just the day name as
+      // section headers; a longer block that merely mentions a day inline
+      // (e.g. "Monday Lecture 9:00 - 10:00") is handled as a normal block.
+      if (dayMatch != null && text.length <= 12) {
         currentDay = dayMatch.group(0)!;
         continue;
       }
 
-      // Detect Time Pattern (e.g., 9:00 - 11:00)
-      final timeRangeMatch = RegExp(
-        r'(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})',
-      ).firstMatch(text);
-
-      if (timeRangeMatch != null) {
-        final startStr = timeRangeMatch.group(1)!;
-        final endStr = timeRangeMatch.group(2)!;
-
-        // Try to find the title - often the text block immediately before or after the time
-        // For now, if the block contains both, we might need to split it
-        String title = text.replaceAll(timeRangeMatch.group(0)!, '').trim();
-
-        if (title.isEmpty) {
-          title = 'Class'; // Fallback
-        }
-
-        events.add(
-          ParsedEvent(
-            title: title,
+      final timeMatch = _timeRangeRegex.firstMatch(text);
+      if (timeMatch != null) {
+        final inlineTitle = text.replaceAll(timeMatch.group(0)!, '').trim();
+        timeBlocks.add(
+          _OcrTimeBlock(
+            boundingBox: block.boundingBox,
             day: currentDay,
-            startTime: _parseTime(startStr),
-            endTime: _parseTime(endStr),
-            venue: 'See Image',
+            startTime: _parseTime(timeMatch.group(1)!),
+            endTime: _parseTime(timeMatch.group(2)!),
+            inlineTitle: inlineTitle.isEmpty ? null : inlineTitle,
           ),
         );
+      } else {
+        titleCandidates.add(block);
       }
+    }
+
+    final usedCandidates = <TextBlock>{};
+    final events = <ParsedEvent>[];
+
+    for (final timeBlock in timeBlocks) {
+      String? title = timeBlock.inlineTitle;
+
+      if (title == null) {
+        // Only associate blocks that are genuinely close together (the same
+        // table cell/row) — a max distance scaled to the time block's own
+        // height keeps this from grabbing an unrelated, merely-nearest-of-
+        // what's-left block on a sparse page.
+        final maxDistance = timeBlock.boundingBox.height * 3;
+        TextBlock? nearest;
+        double nearestDistance = double.infinity;
+
+        for (final candidate in titleCandidates) {
+          if (usedCandidates.contains(candidate)) continue;
+          final distance =
+              (candidate.boundingBox.center - timeBlock.boundingBox.center)
+                  .distance;
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = candidate;
+          }
+        }
+
+        if (nearest != null && nearestDistance <= maxDistance) {
+          title = nearest.text.trim();
+          usedCandidates.add(nearest);
+        }
+      }
+
+      events.add(
+        ParsedEvent(
+          title: (title == null || title.isEmpty) ? 'Class' : title,
+          day: timeBlock.day,
+          startTime: timeBlock.startTime,
+          endTime: timeBlock.endTime,
+          venue: 'See Image',
+        ),
+      );
     }
 
     return events;
@@ -196,6 +256,11 @@ class ImportService {
   }
 
   /// Parses an Excel/CSV file and returns a list of [ParsedEvent]s.
+  ///
+  /// Detects the header row and maps its columns (Day, Subject, Start Time,
+  /// End Time, Venue) by name rather than assuming a fixed column order, so
+  /// a file with columns in a different order — or extra columns — still
+  /// imports correctly.
   static Future<List<ParsedEvent>> parseExcel(File file) async {
     final bytes = file.readAsBytesSync();
     final excel = Excel.decodeBytes(bytes);
@@ -205,18 +270,24 @@ class ImportService {
       final rows = excel.tables[table]?.rows;
       if (rows == null || rows.isEmpty) continue;
 
-      // Basic header detection (future: dynamic mapping)
-      // Assuming: Day | Subject | Start | End | Venue
-      for (int i = 1; i < rows.length; i++) {
+      final mapping = _detectColumnMapping(rows);
+      if (mapping == null) continue;
+
+      for (int i = mapping.headerRowIndex + 1; i < rows.length; i++) {
         final row = rows[i];
-        if (row.length < 4) continue;
+        if (row.isEmpty) continue;
 
         try {
-          final day = row[0]?.value?.toString() ?? '';
-          final title = row[1]?.value?.toString() ?? '';
-          final startStr = row[2]?.value?.toString() ?? '';
-          final endStr = row[3]?.value?.toString() ?? '';
-          final venue = row.length > 4 ? row[4]?.value?.toString() : null;
+          String cellAt(int? index) {
+            if (index == null || index >= row.length) return '';
+            return row[index]?.value?.toString().trim() ?? '';
+          }
+
+          final day = cellAt(mapping.dayIndex);
+          final title = cellAt(mapping.titleIndex);
+          final startStr = cellAt(mapping.startIndex);
+          final endStr = cellAt(mapping.endIndex);
+          final venue = cellAt(mapping.venueIndex);
 
           if (title.isEmpty || startStr.isEmpty) continue;
 
@@ -226,7 +297,7 @@ class ImportService {
               day: day,
               startTime: _parseTime(startStr),
               endTime: _parseTime(endStr),
-              venue: venue,
+              venue: venue.isEmpty ? null : venue,
             ),
           );
         } catch (e) {
@@ -237,6 +308,81 @@ class ImportService {
     }
 
     return parsedEvents;
+  }
+
+  static const _dayHeaderKeywords = ['day', 'weekday'];
+  static const _titleHeaderKeywords = [
+    'subject',
+    'course',
+    'class',
+    'title',
+    'unit',
+    'name',
+  ];
+  static const _startHeaderKeywords = ['start', 'from', 'begin'];
+  static const _endHeaderKeywords = ['end', 'to', 'finish'];
+  static const _venueHeaderKeywords = ['venue', 'room', 'location', 'hall'];
+
+  /// Scans the first few rows of a sheet for a header row containing
+  /// recognizable column names, in any order, and maps each semantic field
+  /// to its column index. Falls back to the previous fixed
+  /// Day | Subject | Start | End | Venue layout if no header row is
+  /// recognized, so files that already matched that assumption still work.
+  static _ColumnMapping? _detectColumnMapping(List<List<Data?>> rows) {
+    bool matchesAny(String cell, List<String> keywords) {
+      final lower = cell.toLowerCase();
+      return keywords.any((k) => lower.contains(k));
+    }
+
+    final searchLimit = rows.length < 5 ? rows.length : 5;
+    for (int r = 0; r < searchLimit; r++) {
+      final row = rows[r];
+      int? dayIdx, titleIdx, startIdx, endIdx, venueIdx;
+
+      for (int c = 0; c < row.length; c++) {
+        final cell = row[c]?.value?.toString().trim() ?? '';
+        if (cell.isEmpty) continue;
+
+        if (dayIdx == null && matchesAny(cell, _dayHeaderKeywords)) {
+          dayIdx = c;
+        } else if (titleIdx == null && matchesAny(cell, _titleHeaderKeywords)) {
+          titleIdx = c;
+        } else if (startIdx == null && matchesAny(cell, _startHeaderKeywords)) {
+          startIdx = c;
+        } else if (endIdx == null && matchesAny(cell, _endHeaderKeywords)) {
+          endIdx = c;
+        } else if (venueIdx == null && matchesAny(cell, _venueHeaderKeywords)) {
+          venueIdx = c;
+        }
+      }
+
+      // Require at least Subject + Start Time to trust this as a real
+      // header row rather than a coincidental keyword match in data.
+      if (titleIdx != null && startIdx != null) {
+        return _ColumnMapping(
+          headerRowIndex: r,
+          dayIndex: dayIdx,
+          titleIndex: titleIdx,
+          startIndex: startIdx,
+          endIndex: endIdx,
+          venueIndex: venueIdx,
+        );
+      }
+    }
+
+    // Fallback: assume the previous fixed layout, header in row 0.
+    if (rows.isNotEmpty && rows[0].length >= 4) {
+      return _ColumnMapping(
+        headerRowIndex: 0,
+        dayIndex: 0,
+        titleIndex: 1,
+        startIndex: 2,
+        endIndex: 3,
+        venueIndex: rows[0].length > 4 ? 4 : null,
+      );
+    }
+
+    return null;
   }
 
   static TimeOfDay _parseTime(String timeStr) {
@@ -259,4 +405,42 @@ class ImportService {
 
     return const TimeOfDay(hour: 0, minute: 0);
   }
+}
+
+/// Maps semantic timetable fields to the column index they were found at
+/// in a detected header row.
+class _ColumnMapping {
+  final int headerRowIndex;
+  final int? dayIndex;
+  final int titleIndex;
+  final int startIndex;
+  final int? endIndex;
+  final int? venueIndex;
+
+  _ColumnMapping({
+    required this.headerRowIndex,
+    required this.dayIndex,
+    required this.titleIndex,
+    required this.startIndex,
+    required this.endIndex,
+    required this.venueIndex,
+  });
+}
+
+/// A recognized time-range block from an OCR pass, and the title it was
+/// either read from inline or (later) associated with by proximity.
+class _OcrTimeBlock {
+  final Rect boundingBox;
+  final String day;
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
+  final String? inlineTitle;
+
+  _OcrTimeBlock({
+    required this.boundingBox,
+    required this.day,
+    required this.startTime,
+    required this.endTime,
+    this.inlineTitle,
+  });
 }
