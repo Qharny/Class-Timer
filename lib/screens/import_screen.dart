@@ -319,63 +319,92 @@ class _ImportScreenState extends State<ImportScreen> {
                   _isLoading = true;
                   _loadingMessages = _syncingMessages;
                 });
-                final existingEvents = _storageService.getAllClassEvents();
-                final existingEntities = existingEvents
-                    .map((e) => EventEntity.fromClassEvent(e))
-                    .toList();
 
-                for (var event in _previewEvents!) {
-                  final newEntity = EventEntity.fromClassEvent(event);
-                  final conflicts = ConflictEngine.detectConflicts(
-                    newEntity,
-                    existingEntities,
-                  );
+                int savedCount = 0;
+                final failedTitles = <String>[];
 
-                  if (conflicts.isNotEmpty && mounted) {
-                    setState(() => _isLoading = false);
-                    await Navigator.push<ClassEvent>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ConflictResolutionScreen(
-                          existingEvent: existingEvents.firstWhere(
-                            (e) => e.id == conflicts.first.id,
+                // A `finally` guarantees _isLoading always gets reset, even
+                // if something below throws — previously an unhandled error
+                // partway through this loop (e.g. a device with no
+                // calendars configured, or any other unexpected failure)
+                // left the screen stuck on the loading indicator forever
+                // with no error shown and no way out.
+                try {
+                  final existingEvents = _storageService.getAllClassEvents();
+                  final existingEntities = existingEvents
+                      .map((e) => EventEntity.fromClassEvent(e))
+                      .toList();
+
+                  for (var event in _previewEvents!) {
+                    try {
+                      final newEntity = EventEntity.fromClassEvent(event);
+                      final conflicts = ConflictEngine.detectConflicts(
+                        newEntity,
+                        existingEntities,
+                      );
+
+                      if (conflicts.isNotEmpty && mounted) {
+                        setState(() => _isLoading = false);
+                        await Navigator.push<ClassEvent>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ConflictResolutionScreen(
+                              existingEvent: existingEvents.firstWhere(
+                                (e) => e.id == conflicts.first.id,
+                              ),
+                              conflictingEvent: event,
+                              allEvents: existingEvents,
+                              onResolved: (finalEvent) {
+                                // Update the event in preview
+                                setState(() {
+                                  event.startTime = finalEvent.startTime;
+                                  event.endTime = finalEvent.endTime;
+                                });
+                              },
+                            ),
                           ),
-                          conflictingEvent: event,
-                          allEvents: existingEvents,
-                          onResolved: (finalEvent) {
-                            // Update the event in preview
-                            setState(() {
-                              event.startTime = finalEvent.startTime;
-                              event.endTime = finalEvent.endTime;
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                    if (mounted) {
-                      setState(() => _isLoading = true);
-                    }
-                    // Fall through: whichever way the user resolved it
-                    // (accept the suggestion, ignore, or edit manually), the
-                    // event still needs to actually be saved below — it must
-                    // not be silently dropped from the import.
-                  }
+                        );
+                        if (mounted) {
+                          setState(() => _isLoading = true);
+                        }
+                        // Fall through: whichever way the user resolved it
+                        // (accept the suggestion, ignore, or edit manually),
+                        // the event still needs to actually be saved below —
+                        // it must not be silently dropped from the import.
+                      }
 
-                  await _storageService.addClassEvent(event);
-                  // Keep the running conflict-check state in sync so two
-                  // events within this same import batch that overlap each
-                  // other are also caught, not just overlaps against
-                  // pre-existing events.
-                  existingEvents.add(event);
-                  existingEntities.add(EventEntity.fromClassEvent(event));
+                      await _storageService.addClassEvent(event);
+                      // Keep the running conflict-check state in sync so two
+                      // events within this same import batch that overlap
+                      // each other are also caught, not just overlaps
+                      // against pre-existing events.
+                      existingEvents.add(event);
+                      existingEntities.add(EventEntity.fromClassEvent(event));
+                      savedCount++;
+                    } catch (e) {
+                      // Don't let one bad event (a malformed time, a plugin
+                      // failure, etc.) take down the whole batch — record it
+                      // and keep going with the rest.
+                      debugPrint('Failed to save "${event.title}": $e');
+                      failedTitles.add(event.title);
+                    }
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() => _isLoading = false);
+                  }
                 }
 
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Timetable synced successfully!'),
-                    ),
-                  );
+                  final message = failedTitles.isEmpty
+                      ? 'Timetable synced successfully!'
+                      : savedCount == 0
+                      ? 'Couldn\'t save any classes. Please check them and try again.'
+                      : 'Synced $savedCount classes. ${failedTitles.length} '
+                            'couldn\'t be saved (${failedTitles.join(', ')}).';
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
                   Navigator.pushReplacementNamed(context, '/dashboard');
                 }
               },

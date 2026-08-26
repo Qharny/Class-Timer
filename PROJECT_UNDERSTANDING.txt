@@ -341,6 +341,31 @@ CalendarSyncService isn't a singleton and caching its resolved state safely
 care than the two fixes above; worth doing if calendar-sync users report
 slow imports specifically.
 
+"CONFIRM & SYNC" STUCK-FOREVER FIX (2026-08-26)
+----------------------------------------------------------------------------
+Root cause: lib/services/calendar_sync_service.dart's syncEvent() picked the
+target calendar via calendars.data!.firstWhere(..., orElse: () =>
+calendars.data!.first) — if the device has zero calendars configured (no
+Google/account signed in, common on fresh installs or emulators),
+calendars.data! is an empty list and .first throws StateError. This is
+called once per class via LocalStorageService.addClassEvent() inside
+import_screen.dart's "Confirm & Sync" loop, which had NO try/catch anywhere
+in the chain — an unhandled exception here silently killed the async
+handler mid-batch, leaving _isLoading stuck at true forever: spinner
+showing, no error, no navigation, no way out. (Only reachable if the user
+has Calendar Sync enabled — off by default — but a real, reproducible dead
+end when it applies.)
+
+Fixed at both levels:
+- calendar_sync_service.dart: guard for calendars.data!.isEmpty and return
+  early instead of crashing.
+- import_screen.dart's "Confirm & Sync" handler: wrapped in try/finally so
+  _isLoading always gets reset no matter what throws, and wrapped each
+  per-event save in its own try/catch so one bad class (malformed data, a
+  plugin failure, anything unforeseen) can't take down the whole batch —
+  it's now skipped and reported by name in the completion SnackBar instead
+  of hanging the screen.
+
 GIT / REPO STATE AT TIME OF WRITING
 -------------------------------------
 Branch: main. Working tree has a modified pubspec.lock. Recent commit history

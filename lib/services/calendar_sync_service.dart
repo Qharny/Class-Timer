@@ -15,7 +15,15 @@ class CalendarSyncService {
     if (!permissionsGranted.isSuccess || !permissionsGranted.data!) return;
 
     final calendars = await _calendarPlugin.retrieveCalendars();
-    if (!calendars.isSuccess || calendars.data == null) return;
+    if (!calendars.isSuccess ||
+        calendars.data == null ||
+        calendars.data!.isEmpty) {
+      // No calendars configured on the device (e.g. no account signed in) —
+      // .first below would throw StateError otherwise, which had been
+      // silently killing the "Confirm & Sync" loop mid-batch with no error
+      // shown and no way for _isLoading to ever get reset.
+      return;
+    }
 
     // Logic to select calendar
     Calendar? targetCalendar;
