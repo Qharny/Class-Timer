@@ -182,6 +182,10 @@ class LocalStorageService {
     await classBox?.clear();
     await studyBox?.clear();
     await settingsBox?.clear();
+    await courseBox?.clear();
+    await programBox?.clear();
+    await productivityBox?.clear();
+    await attendanceBox?.clear();
     await setOnboardingComplete(false); // Reset onboarding on full clear
   }
 
@@ -361,18 +365,24 @@ class LocalStorageService {
     stats.totalCompletedSessions += 1;
     stats.coins += 2; // Fixed session reward
 
+    // Milestone bonuses must be applied before the first persist below,
+    // otherwise the mutation only lives in memory and is lost on restart.
+    if (stats.currentStreak == 7) {
+      stats.coins += 10;
+    } else if (stats.currentStreak == 30) {
+      stats.coins += 50;
+    }
+
     await productivityBox?.put('stats', stats);
 
     // Notification Milestones
     if (stats.currentStreak == 7) {
-      stats.coins += 10;
       await NotificationService().sendInstantNotification(
         id: 1007,
         title: '🔥 7-Day Streak!',
         body: 'You\'re building momentum. Keep it up! (+10 coins)',
       );
     } else if (stats.currentStreak == 30) {
-      stats.coins += 50;
       await NotificationService().sendInstantNotification(
         id: 1030,
         title: '🏆 30 Days Strong!',
@@ -402,7 +412,10 @@ class LocalStorageService {
     DateTime date,
     bool attended,
   ) async {
-    final key = '${eventId}_${date.year}${date.month}${date.day}';
+    final key =
+        '${eventId}_${date.year}'
+        '${date.month.toString().padLeft(2, '0')}'
+        '${date.day.toString().padLeft(2, '0')}';
     await attendanceBox?.put(
       key,
       AttendanceRecord(eventId: eventId, date: date, attended: attended),
@@ -419,5 +432,48 @@ class LocalStorageService {
     if (records.isEmpty) return 100.0;
     final attendedCount = records.where((r) => r.attended).length;
     return (attendedCount / records.length) * 100;
+  }
+
+  // Notification ID allocation
+  //
+  // event.id.hashCode is not a safe notification ID: it isn't guaranteed to
+  // fit the platform's 32-bit int range and can collide between events,
+  // silently overwriting each other's scheduled reminders. Instead we hand
+  // out small, stable, unique IDs per event and remember the mapping.
+  static const String _notificationIdMapKey = 'notification_id_map';
+  static const String _notificationIdCounterKey = 'notification_id_counter';
+  static const int _notificationIdRangeStart = 10000;
+  static const int _notificationIdStep = 10; // room for offsets +1.. +4
+
+  int getNotificationBaseId(String eventId) {
+    final rawMap =
+        settingsBox?.get(_notificationIdMapKey, defaultValue: {}) ?? {};
+    final map = Map<String, dynamic>.from(rawMap as Map);
+
+    final existing = map[eventId];
+    if (existing is int) return existing;
+
+    final counter =
+        (settingsBox?.get(
+              _notificationIdCounterKey,
+              defaultValue: _notificationIdRangeStart,
+            ) ??
+            _notificationIdRangeStart)
+        as int;
+
+    map[eventId] = counter;
+    settingsBox?.put(_notificationIdMapKey, map);
+    settingsBox?.put(_notificationIdCounterKey, counter + _notificationIdStep);
+
+    return counter;
+  }
+
+  Future<void> releaseNotificationBaseId(String eventId) async {
+    final rawMap =
+        settingsBox?.get(_notificationIdMapKey, defaultValue: {}) ?? {};
+    final map = Map<String, dynamic>.from(rawMap as Map);
+    if (map.remove(eventId) != null) {
+      await settingsBox?.put(_notificationIdMapKey, map);
+    }
   }
 }

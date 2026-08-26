@@ -34,11 +34,23 @@ class _ConflictResolutionScreenState extends State<ConflictResolutionScreen> {
   void _generateSuggestion() {
     // Only suggest rescheduling if the conflicting event is a 'study' type
     // Or if one of them is flexible. For now, let's just find a free slot.
-    final domainEvents = widget.allEvents.map((e) => _toEntity(e)).toList();
+    //
+    // EventEntity.fromClassEvent resolves each event's dayOfWeek to its next
+    // real calendar occurrence, so events on different days of the week
+    // don't collapse onto "today" and pollute the free-slot search.
+    final domainEvents = widget.allEvents
+        .map((e) => EventEntity.fromClassEvent(e))
+        .toList();
+
+    // Search for a slot on the actual day the conflicting event occurs on,
+    // not necessarily today.
+    final targetDay = EventEntity.fromClassEvent(
+      widget.conflictingEvent,
+    ).startTime;
 
     final slots = ReschedulingEngine.findFreeSlots(
       existingEvents: domainEvents,
-      day: DateTime.now(), // Simplified: assuming today for suggestion
+      day: targetDay,
       startLimit: const TimeOfDay(hour: 7, minute: 0),
       endLimit: const TimeOfDay(hour: 22, minute: 0),
       minDuration: const Duration(hours: 1),
@@ -49,31 +61,6 @@ class _ConflictResolutionScreenState extends State<ConflictResolutionScreen> {
         _suggestion = slots.first;
       });
     }
-  }
-
-  EventEntity _toEntity(ClassEvent e) {
-    // Basic mapping for engine use
-    return EventEntity(
-      id: e.id,
-      title: e.title,
-      type: e.type == 'class' ? EventType.classEvent : EventType.study,
-      startTime: _parseTime(e.startTime),
-      endTime: _parseTime(e.endTime),
-      venue: e.venue,
-      priority: e.type == 'class' ? 1 : 2,
-    );
-  }
-
-  DateTime _parseTime(String time) {
-    final parts = time.split(':');
-    final now = DateTime.now();
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
   }
 
   @override

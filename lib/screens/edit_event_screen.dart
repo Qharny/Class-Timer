@@ -1,6 +1,7 @@
 import 'package:class_timer/models/course.dart';
 import 'package:flutter/material.dart';
 import '../models/class_event.dart';
+import '../services/conflict_service.dart';
 import '../services/local_storage_service.dart';
 
 class EditEventScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class EditEventScreen extends StatefulWidget {
 class _EditEventScreenState extends State<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storageService = LocalStorageService();
+  final _conflictService = ConflictService();
 
   late TextEditingController _titleController;
   late TextEditingController _venueController;
@@ -103,11 +105,57 @@ class _EditEventScreenState extends State<EditEventScreen> {
         courseId: _selectedCourseId,
       );
 
+      final otherEvents = _storageService.getAllClassEvents()
+          .where((e) => e.id != newEvent.id)
+          .toList();
+      final conflicts = _conflictService.findConflicts(
+        newEvent,
+        otherEvents,
+      );
+
+      if (conflicts.isNotEmpty) {
+        final proceed = await _showConflictDialog(conflicts);
+        if (proceed != true) return;
+      }
+
       await _storageService.addClassEvent(newEvent);
       if (mounted) {
         Navigator.pop(context, true);
       }
     }
+  }
+
+  Future<bool?> _showConflictDialog(List<ClassEvent> conflicts) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Schedule Conflict'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('This overlaps with:'),
+            const SizedBox(height: 12),
+            ...conflicts.map(
+              (c) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text('• ${c.title} (${c.startTime} - ${c.endTime})'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Edit'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save Anyway'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

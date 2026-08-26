@@ -143,47 +143,45 @@ PDF import and true two-way Google Calendar sync do not appear implemented
 
 KNOWN ISSUES (verified 2026-08-26 via flutter analyze/test + code reading)
 ----------------------------------------------------------------------------
-`flutter analyze` is clean and `flutter test` passes except for one real bug
-(#8 below). Issues found by actually reading service implementations and
-their call sites, not just the docs:
+`flutter analyze` is clean. Issues found by actually reading service
+implementations and their call sites, not just the docs.
 
-Confirmed bugs:
-1. "Wipe everything" doesn't wipe everything.
-   lib/services/local_storage_service.dart:181 clearAllData() only clears
-   classBox/studyBox/settingsBox. courseBox, programBox, productivityBox
-   (streaks/coins), and attendanceBox survive. Settings screen advertises
-   this as "Wipe everything from local storage"
-   (lib/screens/settings_screen.dart:405).
-2. Streak milestone bonus coins (+10 @ 7-day streak, +50 @ 30-day streak)
-   are lost on app restart. lib/services/local_storage_service.dart:364-381
-   updateStreak() — productivityBox.put('stats', stats) happens BEFORE the
-   milestone bonus mutates stats.coins, and there's no follow-up save/put,
-   so the bonus never reaches disk.
-3. Attendance record key collisions. local_storage_service.dart:405
-   markAttendance() key = '${eventId}_${date.year}${date.month}${date.day}'
-   with no zero-padding — e.g. Jan 15 and Nov 5 both produce suffix "115",
-   silently overwriting each other's attendance record.
-4. No conflict detection on manual add/edit. ConflictEngine is only called
-   from the import flow (lib/screens/import_screen.dart:388). Add Class /
-   Edit Event screens never check for overlaps. ConflictService
-   (lib/services/conflict_service.dart) is entirely unused/dead code.
-5. ConflictCrusher (used by the matrix-Excel import path,
-   lib/services/conflict_crusher.dart:15) only compares adjacent events
-   after sorting by start time — misses overlaps between non-adjacent
-   events (A and C overlapping around a shorter B in between).
-6. Reschedule suggestions ignore day-of-week.
-   lib/screens/conflict_resolution_screen.dart:54 _toEntity() stamps every
-   event with DateTime.now()'s date, dropping dayOfWeek (comment admits
-   "Simplified: assuming today for suggestion") — can produce wrong
-   "Suggested Fix" times.
-7. Notification IDs built from event.id.hashCode
-   (lib/services/notification_service.dart:88,125,162,199) — not guaranteed
-   to fit a 32-bit int or be collision-free; two events can silently
-   overwrite each other's scheduled reminders.
-8. Timer leak / failing test: main.dart:110's 10-minute GPS proximity
-   Timer.periodic in _ClassTimerProState is never cancelled (no dispose()
-   override). Causes "Timer is still pending" failure in
-   test/widget_test.dart's onboarding smoke test.
+FIXED on 2026-08-26 (flutter analyze clean, all 7 tests pass):
+1. "Wipe everything" now actually clears all boxes.
+   lib/services/local_storage_service.dart clearAllData() now also clears
+   courseBox, programBox, productivityBox, and attendanceBox (previously
+   only classBox/studyBox/settingsBox).
+2. Streak milestone bonus coins (+10 @ 7-day streak, +50 @ 30-day streak) no
+   longer lost on restart. updateStreak() now applies the milestone bonus to
+   stats.coins BEFORE the single productivityBox.put('stats', stats) call.
+3. Attendance record key collisions fixed. markAttendance() now zero-pads
+   month/day in the storage key, so e.g. Jan 15 and Nov 5 no longer collide.
+   Note: any attendance rows written under the old unpadded keys before this
+   fix are orphaned under their old keys (no migration was run).
+4. Conflict detection now runs on manual add/edit, not just import.
+   lib/screens/edit_event_screen.dart _save() now calls the previously-dead
+   ConflictService.findConflicts() against the other stored events and shows
+   an "Edit" / "Save Anyway" dialog when there's an overlap.
+5. ConflictCrusher no longer misses non-adjacent overlaps.
+   lib/services/conflict_crusher.dart detectConflicts() now sweeps with a
+   running "active events" list (tracking max end time) per day instead of
+   only comparing adjacent pairs after sorting; it also now requires
+   dayOfWeek to match (previously ignored day entirely).
+6. Reschedule suggestions respect day-of-week.
+   lib/screens/conflict_resolution_screen.dart now maps events via the
+   existing EventEntity.fromClassEvent (which resolves each event's real
+   next occurrence date) instead of stamping everything with "today," and
+   searches free slots on the conflicting event's actual day.
+7. Notification IDs are now stable, small, and collision-free.
+   LocalStorageService.getNotificationBaseId()/releaseNotificationBaseId()
+   hand out and persist a small counter-based ID per event (base 10000, step
+   10) instead of using event.id.hashCode, which wasn't guaranteed to fit a
+   32-bit int or be collision-free. notification_service.dart's schedule/
+   cancel calls were updated to use it.
+8. Timer leak fixed. main.dart's _ClassTimerProState now stores the 10-min
+   GPS proximity Timer.periodic in a field and cancels it in a new
+   dispose() override. This was causing a real "Timer is still pending"
+   test failure in test/widget_test.dart, which now passes.
 
 Implemented as stubs despite README claims:
 - Focus Mode Do Not Disturb: lib/services/focus_mode_service.dart

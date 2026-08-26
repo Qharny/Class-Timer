@@ -66,6 +66,8 @@ class NotificationService {
     final storage = LocalStorageService();
     if (!storage.getNotificationsEnabled()) return;
 
+    final baseId = storage.getNotificationBaseId(event.id);
+
     // Smart Buffer Dynamic Reminder
     final bufferMinutes = storage.getReminderMinutes();
     final parts = event.startTime.split(':');
@@ -85,7 +87,7 @@ class NotificationService {
 
     await AwesomeNotifications().createNotification(
       content: NotificationContent(
-        id: event.id.hashCode + 4, // unique offset for dynamic buffer
+        id: baseId + 4, // unique offset for dynamic buffer
         channelKey: 'class_reminders',
         title: '${crisisPrefix}Class Buffer Alert',
         body: 'Your class ${event.title} starts in $bufferMinutes minutes.',
@@ -122,7 +124,7 @@ class NotificationService {
 
       await AwesomeNotifications().createNotification(
         content: NotificationContent(
-          id: event.id.hashCode + 1,
+          id: baseId + 1,
           channelKey: 'class_reminders',
           title: 'Class Starting Soon',
           body: 'You have 15 minutes until ${event.title} at ${event.venue}.',
@@ -159,7 +161,7 @@ class NotificationService {
 
       await AwesomeNotifications().createNotification(
         content: NotificationContent(
-          id: event.id.hashCode + 2,
+          id: baseId + 2,
           channelKey: 'class_reminders',
           title: 'Move Now!',
           body: 'Time to head to ${event.venue}. Class starts in 5 minutes.',
@@ -196,7 +198,7 @@ class NotificationService {
 
       await AwesomeNotifications().createNotification(
         content: NotificationContent(
-          id: event.id.hashCode + 3,
+          id: baseId + 3,
           channelKey: 'class_reminders',
           title: 'Wrap Up',
           body: '${event.title} is ending soon. Prepare for transition.',
@@ -290,11 +292,13 @@ class NotificationService {
   }
 
   Future<void> cancelNotificationsForEvent(String eventId) async {
-    final baseId = eventId.hashCode;
+    final storage = LocalStorageService();
+    final baseId = storage.getNotificationBaseId(eventId);
     await AwesomeNotifications().cancel(baseId + 1);
     await AwesomeNotifications().cancel(baseId + 2);
     await AwesomeNotifications().cancel(baseId + 3);
     await AwesomeNotifications().cancel(baseId + 4);
+    await storage.releaseNotificationBaseId(eventId);
   }
 
   Future<void> rescheduleAll() async {

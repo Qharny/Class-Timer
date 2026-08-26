@@ -100,6 +100,7 @@ class ClassTimerPro extends StatefulWidget {
 
 class _ClassTimerProState extends State<ClassTimerPro> {
   late ValueNotifier<ThemeMode> _themeNotifier;
+  Timer? _locationCheckTimer;
 
   @override
   void initState() {
@@ -107,12 +108,21 @@ class _ClassTimerProState extends State<ClassTimerPro> {
     _themeNotifier = ValueNotifier(widget.initialThemeMode);
 
     // Start periodic GPS check for Late Trigger
-    Timer.periodic(const Duration(minutes: 10), (timer) {
+    _locationCheckTimer = Timer.periodic(const Duration(minutes: 10), (
+      timer,
+    ) {
       unawaited(LocationService().checkProximityToCampus());
     });
 
     // Immediate check on start (non-blocking)
     unawaited(LocationService().checkProximityToCampus());
+  }
+
+  @override
+  void dispose() {
+    _locationCheckTimer?.cancel();
+    _themeNotifier.dispose();
+    super.dispose();
   }
 
   @override
